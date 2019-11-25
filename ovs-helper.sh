@@ -40,6 +40,23 @@ ovs_start_db_server()
 }
 
 #==================================================================================================================
+#
+#==================================================================================================================
+ovs_bridge_add_port()
+{
+  local port="$1"
+  local bridge="$2"
+
+  ip tuntap add mode tap $port
+
+  ip link set $port up
+
+  ovs-vsctl add-port $bridge $port
+  
+  echo "Added tap port/interface: [$port] to ovs bridge: [$bridge]"
+}
+
+#==================================================================================================================
 # 
 #==================================================================================================================
 ovs_deploy_test()
@@ -60,20 +77,14 @@ ovs_deploy_test()
 
   dhclient br0
 
-
   # tap port for VM1
-  ip tuntap add mode tap tap_port1
-
-  ip link set tap_port1 up
-
-  ovs-vsctl add-port br0 tap_port1
+  ovs_bridge_add_port tap_port1 br0
 
   # tap port for VM2
-  ip tuntap add mode tap tap_port2
+  ovs_bridge_add_port tap_port2 br0
 
-  ip link set tap_port2 up
-
-  ovs-vsctl add-port br0 tap_port2
+  # tap port for VM3
+  ovs_bridge_add_port tap_port3 br0
 }
 
 #==================================================================================================================
