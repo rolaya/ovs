@@ -23,7 +23,6 @@ ovs_config_db()
   ovsdb-tool create /usr/local/etc/openvswitch/conf.db vswitchd/vswitch.ovsschema
 }
 
-
 #==================================================================================================================
 # 
 #==================================================================================================================
@@ -59,6 +58,30 @@ ovs_bridge_add_port()
 #==================================================================================================================
 # 
 #==================================================================================================================
+ovs_start()
+{
+  # These commands are executed as "root" user (for now)
+  
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+  
+  ovs-ctl start
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_stop()
+{
+  # These commands are executed as "root" user (for now)
+
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+
+  ovs-ctl stop
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 ovs_deploy_test()
 {
   # These commands are executed as "root" user (for now)
@@ -88,6 +111,19 @@ ovs_deploy_test()
 }
 
 #==================================================================================================================
+#
+#==================================================================================================================
+ovs_purge_deployment()
+{
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+
+  ovs-vsctl del-port tap_port1
+  ovs-vsctl del-port tap_port2
+  ovs-vsctl del-port tap_port3
+  ovs-vsctl del-br br0
+}
+
+#==================================================================================================================
 # 
 #==================================================================================================================
 ovs_run_test()
@@ -101,6 +137,37 @@ ovs_run_test()
   ovs-ctl start
 
   dhclient br0
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_test_tc()
+{
+  # These commands are executed as "root" user (for now)
+
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+
+  ovs-ctl start
+
+  ovs-vsctl add-br br0
+
+  # tap port for VM1
+  ovs_bridge_add_port tap_port1 br0
+}
+
+ovs_traffic_shape()
+{
+  ovs-vsctl -- \
+  set interface tap_port1 ofport_request=5 -- \
+  set interface tap_port2 ofport_request=6 -- \
+  set port enp5s0 qos=@newqos -- \
+  --id=@newqos create qos type=linux-htb \
+      other-config:max-rate=1000000000 \
+      queues:123=@tap_port1_queue \
+      queues:234=@tap_port2_queue -- \
+  --id=@tap_port1_queue create queue other-config:max-rate=10000000 -- \
+  --id=@tap_port2_queue create queue other-config:max-rate=20000000
 }
 
 
