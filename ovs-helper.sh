@@ -1,6 +1,7 @@
 #!/bin/sh
 
 echo "Use \"ovs_deploy_network\" to deploy network configuration"
+echo "Use \"ovs_traffic_shape\" to shape traffic"
 
 #==================================================================================================================
 # 
