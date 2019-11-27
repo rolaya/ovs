@@ -1,7 +1,14 @@
 #!/bin/sh
 
+# Display some helpers to the user
 echo "Use \"ovs_deploy_network\" to deploy network configuration"
-echo "Use \"ovs_traffic_shape\" to shape traffic"
+echo "Use \"ovs_set_qos\" to set QoS"
+
+# The name of the physical wired interface (host specific)
+wired_iface=enp5s0
+
+# The name of the OVS bridge to create
+ovs_bridge=br0
 
 #==================================================================================================================
 # 
@@ -92,41 +99,43 @@ ovs_deploy_network()
 {
   # These commands are executed as "root" user (for now)
   
+  echo "Deploying testbed network..."
+
   # Update path with ovs scripts path.
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # Starts "ovs-vswitchd:" and "ovsdb-server" daemons
-  ovs-ctl start
+  ovs-ctl start --delete-bridges
 
   # create new bridge named "br0"
-  ovs-vsctl add-br br0
+  ovs-vsctl add-br $ovs_bridge
   
   # Activate "br0" device 
-  ip link set br0 up
+  ip link set $ovs_bridge up
 
   # Add network device "enp5s0" to "br0" bridge. Device "enp5s0" is the
   # name of the actual physical wired network interface. In some devices
   # it may be eth0.
-  ovs-vsctl add-port br0 enp5s0
+  ovs-vsctl add-port $ovs_bridge $wired_iface
   
   # Delete assigned ip address from "enp5s0" device/interface. This address 
   # was provided (served) by the DHCP server (in the local network).
   # For simplicity, I configured my verizon router to always assign this
   # ip address (192.168.1.206) to "this" host (i.e. the host where I am 
   # deploying ovs).
-  ip addr del 192.168.1.206/24 dev enp5s0
+  ip addr del 192.168.1.206/24 dev $wired_iface
 
   # Acquire ip address and assign it to the "br0" bridge/interface
-  dhclient br0
+  dhclient $ovs_bridge
 
   # Create a tap interface for VM1 (and add interface to "br0" bridge).
-  ovs_bridge_add_port tap_port1 br0
+  ovs_bridge_add_port tap_port1 $ovs_bridge
 
   # Create a tap interface for VM2 (and add interface to "br0" bridge).
-  ovs_bridge_add_port tap_port2 br0
+  ovs_bridge_add_port tap_port2 $ovs_bridge
 
   # Create a tap interface for VM3 (and add interface to "br0" bridge).
-  ovs_bridge_add_port tap_port3 br0
+  ovs_bridge_add_port tap_port3 $ovs_bridge
 }
 
 #==================================================================================================================
@@ -143,7 +152,7 @@ ovs_purge_network_deployment()
   ovs-vsctl del-port tap_port1
   ovs-vsctl del-port tap_port2
   ovs-vsctl del-port tap_port3
-  ovs-vsctl del-br br0
+  ovs-vsctl del-br $ovs_bridge
 }
 
 #==================================================================================================================
@@ -155,11 +164,11 @@ ovs_run_test()
   
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
-  ip addr del 192.168.1.206/24 dev enp5s0
+  ip addr del 192.168.1.206/24 dev $wired_iface
   
   ovs-ctl start
 
-  dhclient br0
+  dhclient $ovs_bridge
 }
 
 #==================================================================================================================
@@ -173,10 +182,22 @@ ovs_test_tc()
 
   ovs-ctl start
 
-  ovs-vsctl add-br br0
+  ovs-vsctl add-br $ovs_bridge
 
   # tap port for VM1
-  ovs_bridge_add_port tap_port1 br0
+  ovs_bridge_add_port tap_port1 $ovs_bridge
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_set_qos()
+{
+  # Configure traffic shaping
+  ovs_traffic_shape
+
+  # Configure traffic flows
+  ovs_configure_traffic_flows
 }
 
 #==================================================================================================================
@@ -192,11 +213,22 @@ ovs_traffic_shape()
   ovs-vsctl -- \
   set interface tap_port1 ofport_request=5 -- \
   set interface tap_port2 ofport_request=6 -- \
-  set port enp5s0 qos=@newqos -- \
+  set port $wired_iface qos=@newqos -- \
   --id=@newqos create qos type=linux-htb \
       other-config:max-rate=1000000000 \
       queues:123=@tap_port1_queue \
       queues:234=@tap_port2_queue -- \
   --id=@tap_port1_queue create queue other-config:max-rate=10000000 -- \
   --id=@tap_port2_queue create queue other-config:max-rate=20000000
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_configure_traffic_flows()
+{
+  # Use OpenFlow to direct packets from tap_port1, tap_port2 to their respective 
+  # (traffic shaping) queues (reserved for them in "ovs_traffic_shape").
+  ovs-ofctl add-flow $ovs_bridge in_port=5,actions=set_queue:123,normal
+  ovs-ofctl add-flow $ovs_bridge in_port=6,actions=set_queue:234,normal
 }
