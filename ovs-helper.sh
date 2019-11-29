@@ -4,6 +4,8 @@
 echo "Use \"ovs_deploy_network\" to deploy network configuration"
 echo "Use \"ovs_set_qos\" to set QoS"
 
+echo "Use \"ovs_purge_network\" to purge deployed network"
+
 # The name of the physical wired interface (host specific)
 wired_iface=enp5s0
 
@@ -66,6 +68,26 @@ ovs_bridge_add_port()
   ovs-vsctl add-port $bridge $port
   
   echo "Added tap port/interface: [$port] to ovs bridge: [$bridge]"
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_bridge_del_port()
+{
+  local port="$1"
+  local bridge="$2"
+
+  # Delete tap device/interface to "br0" bridge
+  ovs-vsctl del-port $bridge $port
+  
+  # Delete tap port
+  ip tuntap del mode tap $port
+
+  # Deactivate device/interface 
+  ip link set $port down
+  
+  echo "Deleted tap port/interface: [$port] from ovs bridge: [$bridge]"
 }
 
 #==================================================================================================================
@@ -232,3 +254,41 @@ ovs_configure_traffic_flows()
   ovs-ofctl add-flow $ovs_bridge in_port=5,actions=set_queue:123,normal
   ovs-ofctl add-flow $ovs_bridge in_port=6,actions=set_queue:234,normal
 }
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_purge_network()
+{
+  # These commands are executed as "root" user (for now)
+  
+  echo "Purging testbed network..."
+
+  # Update path with ovs scripts path.
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+
+  # Delete tap port tap_port3 from ovs bridge
+  ovs_bridge_del_port tap_port3 $ovs_bridge
+
+  # Delete tap port tap_port2 from ovs bridge
+  ovs_bridge_del_port tap_port2 $ovs_bridge
+  
+  # Delete tap port tap_port1 from ovs bridge
+  ovs_bridge_del_port tap_port1 $ovs_bridge
+  
+  # Delete physical wired port from ovs bridge
+  ovs-vsctl del-port $ovs_bridge $wired_iface
+  
+  # Deactivate "br0" device 
+  ip link set $ovs_bridge down
+  
+  # Delete bridge named "br0" from ovs
+  ovs-vsctl del-br $ovs_bridge
+
+  # Bring up physical wired interface
+  ip link set $wired_iface up
+
+  # Acquire ip address and assign it to the physical wired interface
+  dhclient $wired_iface
+}
+
