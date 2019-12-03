@@ -36,6 +36,107 @@ VLOG_DEFINE_THIS_MODULE(debug);
 //==================================================================================================================
 //
 //==================================================================================================================
+char* netlink_to_string(int protocol)
+{
+  char *prototol_name;
+
+  switch(protocol)
+  {
+  case NETLINK_ROUTE:
+    prototol_name = "NETLINK_ROUTE";
+    break;
+  
+  case NETLINK_UNUSED:
+    prototol_name = "NETLINK_UNUSED";
+    break;
+
+  case NETLINK_USERSOCK:
+    prototol_name = "NETLINK_USERSOCK";
+    break;
+    
+  case NETLINK_FIREWALL:
+    prototol_name = "NETLINK_FIREWALL";
+    break;
+
+  case NETLINK_SOCK_DIAG:
+    prototol_name = "NETLINK_SOCK_DIAG";
+    break;
+
+  case NETLINK_NFLOG:
+    prototol_name = "NETLINK_NFLOG";
+    break;
+    
+  case NETLINK_XFRM:
+    prototol_name = "NETLINK_XFRM";
+    break;
+    
+  case NETLINK_SELINUX:
+    prototol_name = "NETLINK_SELINUX";
+    break;
+
+  case NETLINK_ISCSI:
+    prototol_name = "NETLINK_ISCSI";
+    break;
+    
+  case NETLINK_AUDIT:
+    prototol_name = "NETLINK_AUDIT";
+    break;
+
+  case NETLINK_FIB_LOOKUP:
+    prototol_name = "NETLINK_FIB_LOOKUP";
+    break;
+  
+  case NETLINK_CONNECTOR:
+    prototol_name = "NETLINK_CONNECTOR";
+    break;
+
+  case NETLINK_NETFILTER:
+    prototol_name = "NETLINK_NETFILTER";
+    break;
+    
+  case NETLINK_IP6_FW:
+    prototol_name = "NETLINK_IP6_FW";
+    break;
+
+  case NETLINK_DNRTMSG:
+    prototol_name = "NETLINK_DNRTMSG";
+    break;
+
+  case NETLINK_KOBJECT_UEVENT:
+    prototol_name = "NETLINK_KOBJECT_UEVENT";
+    break;
+    
+  case NETLINK_GENERIC:
+    prototol_name = "NETLINK_GENERIC";
+    break;
+    
+  case NETLINK_SCSITRANSPORT:
+    prototol_name = "NETLINK_SCSITRANSPORT";
+    break;
+
+  case NETLINK_ECRYPTFS:
+    prototol_name = "NETLINK_ECRYPTFS";
+    break;
+    
+  case NETLINK_RDMA:
+    prototol_name = "NETLINK_RDMA";
+    break;
+
+  case NETLINK_CRYPTO:
+    prototol_name = "NETLINK_CRYPTO";
+    break;
+    
+  default:
+    prototol_name = "NETLINK_???";
+    break;
+  }
+
+  return prototol_name;
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
 char* rtm_to_string(int code)
 {
   char *rtm_name;
@@ -356,7 +457,67 @@ char* tca_to_string(uint16_t type)
 }
 
 
-#define PRINT_FORMAT_uint8_t              0x00000001
+//==================================================================================================================
+//
+//==================================================================================================================
+ssize_t dbg_sock_send(int fd, const void *buf, size_t size, int flags, const char* caller)
+{
+  ssize_t result;
+
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+  VLOG_INFO("%s: fd: [%u] caller: [%s]...", __FUNCTION__, fd, caller);
+  LogBuffer((char*)caller, buf, size);
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+  result = send(fd, buf, size, flags);
+
+  return result;
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
+ssize_t dbg_sock_sendmsg(int fd, const struct msghdr *msg, int flags, const char* caller)
+{
+  ssize_t result;
+
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+  VLOG_INFO("%s: fd: [%u] msg->msg_iovlen: [%d] caller: [%s]...", __FUNCTION__, fd, msg->msg_iovlen, caller);
+  dbg_sock_dump_msghdr(msg);
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+  result = sendmsg(fd, msg, flags);
+
+  return result;
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
+void dbg_sock_dump_msghdr(const struct msghdr *msg)
+{
+  int k;
+  struct iovec *iovec;
+
+  //VLOG_INFO("%s: fd: [%u] caller: [%s]...", __FUNCTION__, fd, caller);
+  LogBuffer((char*)"msg_name", msg->msg_name, msg->msg_namelen);
+
+  for(k = 0; k < msg->msg_iovlen; k++)
+  {
+    iovec = &msg->msg_iov[k];
+    
+    dbg_sock_dump_iovec(iovec);
+  }
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
+void dbg_sock_dump_iovec(struct iovec *iovec)
+{
+  LogBuffer((char*)"iovec", iovec->iov_base, iovec->iov_len);
+}
+
 #define FORMAT_INFO_INCLUDE_HEX_PREFIX  0x00000002
 #define FORMAT_INFO_INCLUDE_DECODING    0x00000004
 
