@@ -569,7 +569,7 @@ struct netdev_class {
      *
      * May be NULL if 'netdev' does not support QoS at all. */
     int (*set_qos)(struct netdev *netdev,
-                   const char *type, const struct smap *details);
+                   const char *type, const struct smap *details, const char* caller);
 
     /* Queries 'netdev' for information about the queue numbered 'queue_id'.
      * If successful, adds that information as string key-value pairs to

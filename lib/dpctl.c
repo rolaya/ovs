@@ -2403,7 +2403,7 @@ dpctl_normalize_actions(int argc, const char *argv[],
 
         af = get_actions_for_flow(&actions_per_flow, &flow);
         nl_msg_put_unspec(&af->actions, nl_attr_type(a),
-                          nl_attr_get(a), nl_attr_get_size(a));
+                          nl_attr_get(a), nl_attr_get_size(a), __FUNCTION__);
     }
 
     n_afs = hmap_count(&actions_per_flow);

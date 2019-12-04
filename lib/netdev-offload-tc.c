@@ -398,7 +398,7 @@ netdev_tc_flow_dump_create(struct netdev *netdev,
 static int
 netdev_tc_flow_dump_destroy(struct netdev_flow_dump *dump)
 {
-    nl_dump_done(dump->nl_dump);
+    nl_dump_done(dump->nl_dump, __FUNCTION__);
     netdev_close(dump->netdev);
     free(dump->nl_dump);
     free(dump);
@@ -779,7 +779,7 @@ netdev_tc_flow_dump_next(struct netdev_flow_dump *dump,
 {
     struct ofpbuf nl_flow;
 
-    while (nl_dump_next(dump->nl_dump, &nl_flow, rbuffer)) {
+    while (nl_dump_next(dump->nl_dump, &nl_flow, rbuffer, __FUNCTION__)) {
         struct tc_flower flower;
         struct netdev *netdev = dump->netdev;
 

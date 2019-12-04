@@ -40,6 +40,7 @@
 #include "packets.h"
 #include "openvswitch/poll-loop.h"
 #include "util.h"
+#include "debug.h"
 #include "openvswitch/vlog.h"
 #ifdef __linux__
 #include <linux/if_packet.h>
@@ -286,7 +287,7 @@ check_connection_completion(int fd)
 #endif
     if (retval == 1) {
         if (pfd.revents & (POLLERR | POLLHUP)) {
-            ssize_t n = send(fd, "", 1, 0);
+            ssize_t n = SOCK_SEND(fd, "", 1, 0);
             if (n < 0) {
                 return sock_errno();
             } else {
@@ -1247,7 +1248,7 @@ emulate_sendmmsg(int fd, struct mmsghdr *msgs, unsigned int n,
                  unsigned int flags)
 {
     for (unsigned int i = 0; i < n; i++) {
-        ssize_t retval = sendmsg(fd, &msgs[i].msg_hdr, flags);
+        ssize_t retval = SOCK_SENDMSG(fd, &msgs[i].msg_hdr, flags);
         if (retval < 0) {
             return i ? i : retval;
         }

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+//ro_check:
+
 #include <config.h>
 
 #include "netdev-linux.h"
@@ -276,6 +278,8 @@ struct tc_queue {
     long long int created;      /* Time queue was created, in msecs. */
 };
 
+//rolaya_check
+
 /* A particular kind of traffic control.  Each implementation generally maps to
  * one particular Linux qdisc class.
  *
@@ -310,7 +314,7 @@ struct tc_ops {
      *
      * (This function is null for tc_ops_other, which cannot be installed.  For
      * other TC classes it should always be nonnull.) */
-    int (*tc_install)(struct netdev *netdev, const struct smap *details);
+    int (*tc_install)(struct netdev *netdev, const struct smap *details, const char* caller);
 
     /* Called when the netdev code determines (through a Netlink query) that
      * this TC class's qdisc is installed on 'netdev', but we didn't install
@@ -361,7 +365,7 @@ struct tc_ops {
      *
      * This function may be null if 'tc' is not configurable.
      */
-    int (*qdisc_set)(struct netdev *, const struct smap *details);
+    int (*qdisc_set)(struct netdev *, const struct smap *details, const char* caller);
 
     /* Retrieves details of 'queue' on 'netdev->tc' into 'details'.  'queue' is
      * one of the 'struct tc_queue's within 'netdev->tc->queues'.
@@ -465,12 +469,12 @@ static uint32_t tc_time_to_ticks(uint32_t time);
 static struct tcmsg *netdev_linux_tc_make_request(const struct netdev *,
                                                   int type,
                                                   unsigned int flags,
-                                                  struct ofpbuf *);
+                                                  struct ofpbuf *, const char* caller);
 static int tc_add_policer(struct netdev *,
                           uint32_t kbits_rate, uint32_t kbits_burst);
 
 static int tc_parse_qdisc(const struct ofpbuf *, const char **kind,
-                          struct nlattr **options);
+                          struct nlattr **options, const char* caller);
 static int tc_parse_class(const struct ofpbuf *, unsigned int *queue_id,
                           struct nlattr **options,
                           struct netdev_queue_stats *);
@@ -480,7 +484,7 @@ static int tc_query_class(const struct netdev *,
 static int tc_delete_class(const struct netdev *, unsigned int handle);
 
 static int tc_del_qdisc(struct netdev *netdev);
-static int tc_query_qdisc(const struct netdev *netdev);
+static int tc_query_qdisc(const struct netdev *netdev, const char* caller);
 
 void
 tc_put_rtab(struct ofpbuf *msg, uint16_t type, const struct tc_ratespec *rate);
@@ -532,6 +536,8 @@ netdev_linux_netnsid_update__(struct netdev_linux *netdev)
     struct dpif_netlink_vport reply;
     struct ofpbuf *buf;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
     error = dpif_netlink_vport_get(netdev_get_name(&netdev->up), &reply, &buf);
     if (error) {
@@ -600,20 +606,20 @@ netdev_linux_notify_sock(void)
     if (ovsthread_once_start(&once)) {
         int error;
 
-        error = nl_sock_create(NETLINK_ROUTE, &sock);
+        error = nl_sock_create(NETLINK_ROUTE, &sock, __FUNCTION__);
         if (!error) {
             size_t i;
 
             for (i = 0; i < ARRAY_SIZE(mcgroups); i++) {
-                error = nl_sock_join_mcgroup(sock, mcgroups[i]);
+                error = nl_sock_join_mcgroup(sock, mcgroups[i], __FUNCTION__);
                 if (error) {
-                    nl_sock_destroy(sock);
+                    nl_sock_destroy(sock, __FUNCTION__);
                     sock = NULL;
                     break;
                 }
             }
         }
-        nl_sock_listen_all_nsid(sock, true);
+        nl_sock_listen_all_nsid(sock, true, __FUNCTION__);
         ovsthread_once_done(&once);
     }
 
@@ -641,6 +647,9 @@ netdev_linux_update_lag(struct rtnetlink_change *change)
     OVS_REQUIRES(lag_mutex)
 {
     struct linux_lag_slave *lag;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     if (!rtnetlink_type_is_rtnlgrp_link(change->nlmsg_type)) {
         return;
@@ -705,6 +714,8 @@ netdev_linux_run(const struct netdev_class *netdev_class OVS_UNUSED)
 {
     struct nl_sock *sock;
     int error;
+  
+    //VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (netdev_linux_miimon_enabled()) {
         netdev_linux_miimon_run();
@@ -721,7 +732,7 @@ netdev_linux_run(const struct netdev_class *netdev_class OVS_UNUSED)
         struct ofpbuf buf;
 
         ofpbuf_use_stub(&buf, buf_stub, sizeof buf_stub);
-        error = nl_sock_recv(sock, &buf, &nsid, false);
+        error = nl_sock_recv(sock, &buf, &nsid, false, __FUNCTION__);
         if (!error) {
             struct rtnetlink_change change;
 
@@ -755,7 +766,7 @@ netdev_linux_run(const struct netdev_class *netdev_class OVS_UNUSED)
             struct shash device_shash;
             struct shash_node *node;
 
-            nl_sock_drain(sock);
+            nl_sock_drain(sock, __FUNCTION__);
 
             shash_init(&device_shash);
             netdev_get_devices(&netdev_linux_class, &device_shash);
@@ -791,7 +802,7 @@ netdev_linux_wait(const struct netdev_class *netdev_class OVS_UNUSED)
     }
     sock = netdev_linux_notify_sock();
     if (sock) {
-        nl_sock_wait(sock, POLLIN);
+        nl_sock_wait(sock, POLLIN, __FUNCTION__);
     }
 }
 
@@ -800,6 +811,9 @@ netdev_linux_changed(struct netdev_linux *dev,
                      unsigned int ifi_flags, unsigned int mask)
     OVS_REQUIRES(dev->mutex)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     netdev_change_seq_changed(&dev->up);
 
     if ((dev->ifi_flags ^ ifi_flags) & IFF_RUNNING) {
@@ -911,6 +925,9 @@ netdev_linux_construct(struct netdev *netdev_)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     int error = netdev_linux_common_construct(netdev_);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (error) {
         return error;
     }
@@ -944,6 +961,9 @@ netdev_linux_construct_tap(struct netdev *netdev_)
     static const char tap_dev[] = "/dev/net/tun";
     const char *name = netdev_->name;
     struct ifreq ifr;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     int error = netdev_linux_common_construct(netdev_);
     if (error) {
@@ -994,6 +1014,9 @@ static void
 netdev_linux_destruct(struct netdev *netdev_)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (netdev->tc && netdev->tc->ops->tc_destroy) {
         netdev->tc->ops->tc_destroy(netdev->tc);
@@ -1406,6 +1429,9 @@ netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
     int error = 0;
     int sock = 0;
 
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!is_tap_netdev(netdev_)) {
         if (netdev_linux_netnsid_is_remote(netdev_linux_cast(netdev_))) {
             error = EOPNOTSUPP;
@@ -1586,6 +1612,9 @@ netdev_linux_set_mtu(struct netdev *netdev_, int mtu)
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct ifreq ifr;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     if (netdev_linux_netnsid_is_remote(netdev)) {
@@ -1861,6 +1890,9 @@ get_stats_via_vport(const struct netdev *netdev_,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
 
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!netdev->vport_stats_error ||
         !(netdev->cache_valid & VALID_VPORT_STAT_ERROR)) {
         int error;
@@ -1884,6 +1916,9 @@ netdev_linux_get_stats(const struct netdev *netdev_,
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct netdev_stats dev_stats;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     get_stats_via_vport(netdev_, stats);
@@ -1935,6 +1970,9 @@ netdev_tap_get_stats(const struct netdev *netdev_, struct netdev_stats *stats)
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct netdev_stats dev_stats;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     get_stats_via_vport(netdev_, stats);
@@ -2011,6 +2049,9 @@ netdev_linux_read_features(struct netdev_linux *netdev)
     struct ethtool_cmd ecmd;
     uint32_t speed;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     if (netdev->cache_valid & VALID_FEATURES) {
         return;
@@ -2169,6 +2210,9 @@ netdev_linux_get_features(const struct netdev *netdev_,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     if (netdev_linux_netnsid_is_remote(netdev)) {
@@ -2198,6 +2242,9 @@ netdev_linux_set_advertisements(struct netdev *netdev_,
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct ethtool_cmd ecmd;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
 
@@ -2288,10 +2335,13 @@ static void
 nl_msg_put_act_police(struct ofpbuf *request, struct tc_police police)
 {
     size_t offset;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "police");
+
+    nl_msg_put_string(request, TCA_ACT_KIND, "police", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
-    nl_msg_put_unspec(request, TCA_POLICE_TBF, &police, sizeof police);
+    nl_msg_put_unspec(request, TCA_POLICE_TBF, &police, sizeof police, __FUNCTION__);
     tc_put_rtab(request, TCA_POLICE_RATE, &police.rate);
     nl_msg_put_u32(request, TCA_POLICE_RESULT, TC_ACT_UNSPEC);
     nl_msg_end_nested(request, offset);
@@ -2311,6 +2361,8 @@ tc_add_matchall_policer(struct netdev *netdev, uint32_t kbits_rate,
     struct ofpbuf *reply;
     struct tcmsg *tcmsg;
     uint32_t handle = 1;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
     err = get_ifindex(netdev, &ifindex);
     if (err) {
@@ -2319,13 +2371,13 @@ tc_add_matchall_policer(struct netdev *netdev, uint32_t kbits_rate,
 
     index = block_id ? TCM_IFINDEX_MAGIC_BLOCK : ifindex;
     tcmsg = tc_make_request(index, RTM_NEWTFILTER, NLM_F_CREATE | NLM_F_ECHO,
-                            &request);
+                            &request, __FUNCTION__);
     tcmsg->tcm_parent = block_id ? : TC_INGRESS_PARENT;
     tcmsg->tcm_info = tc_make_handle(prio, eth_type);
     tcmsg->tcm_handle = handle;
 
     pol_act = tc_matchall_fill_police(kbits_rate, kbits_burst);
-    nl_msg_put_string(&request, TCA_KIND, "matchall");
+    nl_msg_put_string(&request, TCA_KIND, "matchall", __FUNCTION__);
     basic_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
     action_offset = nl_msg_start_nested(&request, TCA_MATCHALL_ACT);
     inner_offset = nl_msg_start_nested(&request, 1);
@@ -2334,7 +2386,7 @@ tc_add_matchall_policer(struct netdev *netdev, uint32_t kbits_rate,
     nl_msg_end_nested(&request, action_offset);
     nl_msg_end_nested(&request, basic_offset);
 
-    err = tc_transact(&request, &reply);
+    err = tc_transact(&request, &reply, __FUNCTION__);
     if (!err) {
         struct tcmsg *tc =
             ofpbuf_at_assert(reply, NLMSG_HDRLEN, sizeof *tc);
@@ -2350,6 +2402,9 @@ tc_del_matchall_policer(struct netdev *netdev)
     uint32_t block_id = 0;
     int ifindex;
     int err;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     err = get_ifindex(netdev, &ifindex);
     if (err) {
@@ -2372,7 +2427,11 @@ netdev_linux_set_policing(struct netdev *netdev_,
                           uint32_t kbits_rate, uint32_t kbits_burst)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     const char *netdev_name = netdev_get_name(netdev_);
+  
     int ifindex;
     int error;
 
@@ -2454,6 +2513,9 @@ netdev_linux_get_qos_types(const struct netdev *netdev OVS_UNUSED,
                            struct sset *types)
 {
     const struct tc_ops *const *opsp;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     for (opsp = tcs; *opsp != NULL; opsp++) {
         const struct tc_ops *ops = *opsp;
         if (ops->tc_install && ops->ovs_name[0] != '\0') {
@@ -2467,6 +2529,9 @@ static const struct tc_ops *
 tc_lookup_ovs_name(const char *name)
 {
     const struct tc_ops *const *opsp;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     for (opsp = tcs; *opsp != NULL; opsp++) {
         const struct tc_ops *ops = *opsp;
@@ -2481,6 +2546,9 @@ static const struct tc_ops *
 tc_lookup_linux_name(const char *name)
 {
     const struct tc_ops *const *opsp;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     for (opsp = tcs; *opsp != NULL; opsp++) {
         const struct tc_ops *ops = *opsp;
@@ -2517,7 +2585,13 @@ netdev_linux_get_qos_capabilities(const struct netdev *netdev OVS_UNUSED,
                                   const char *type,
                                   struct netdev_qos_capabilities *caps)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     const struct tc_ops *ops = tc_lookup_ovs_name(type);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!ops) {
         return EOPNOTSUPP;
     }
@@ -2531,6 +2605,9 @@ netdev_linux_get_qos(const struct netdev *netdev_,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     if (netdev_linux_netnsid_is_remote(netdev)) {
@@ -2538,7 +2615,7 @@ netdev_linux_get_qos(const struct netdev *netdev_,
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (!error) {
         *typep = netdev->tc->ops->ovs_name;
         error = (netdev->tc->ops->qdisc_get
@@ -2553,11 +2630,13 @@ exit:
 
 static int
 netdev_linux_set_qos(struct netdev *netdev_,
-                     const char *type, const struct smap *details)
+                     const char *type, const struct smap *details, const char* caller)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     const struct tc_ops *new_ops;
     int error;
+  
+    VLOG_INFO("%s: type: [%s] caller: [%s]...", __FUNCTION__, type, (char*)caller);
 
     new_ops = tc_lookup_ovs_name(type);
     if (!new_ops || !new_ops->tc_install) {
@@ -2565,7 +2644,7 @@ netdev_linux_set_qos(struct netdev *netdev_,
     }
 
     if (new_ops == &tc_ops_noop) {
-        return new_ops->tc_install(netdev_, details);
+        return new_ops->tc_install(netdev_, details, __FUNCTION__);
     }
 
     ovs_mutex_lock(&netdev->mutex);
@@ -2574,13 +2653,13 @@ netdev_linux_set_qos(struct netdev *netdev_,
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (error) {
         goto exit;
     }
 
     if (new_ops == netdev->tc->ops) {
-        error = new_ops->qdisc_set ? new_ops->qdisc_set(netdev_, details) : 0;
+        error = new_ops->qdisc_set ? new_ops->qdisc_set(netdev_, details, __FUNCTION__) : 0;
     } else {
         /* Delete existing qdisc. */
         error = tc_del_qdisc(netdev_);
@@ -2590,7 +2669,7 @@ netdev_linux_set_qos(struct netdev *netdev_,
         ovs_assert(netdev->tc == NULL);
 
         /* Install new qdisc. */
-        error = new_ops->tc_install(netdev_, details);
+        error = new_ops->tc_install(netdev_, details, __FUNCTION__);
         ovs_assert((error == 0) == (netdev->tc != NULL));
     }
 
@@ -2605,6 +2684,9 @@ netdev_linux_get_queue(const struct netdev *netdev_,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     if (netdev_linux_netnsid_is_remote(netdev)) {
@@ -2612,7 +2694,7 @@ netdev_linux_get_queue(const struct netdev *netdev_,
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (!error) {
         struct tc_queue *queue = tc_find_queue(netdev_, queue_id);
         error = (queue
@@ -2631,6 +2713,9 @@ netdev_linux_set_queue(struct netdev *netdev_,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     if (netdev_linux_netnsid_is_remote(netdev)) {
@@ -2638,7 +2723,7 @@ netdev_linux_set_queue(struct netdev *netdev_,
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (!error) {
         error = (queue_id < netdev->tc->ops->n_queues
                  && netdev->tc->ops->class_set
@@ -2654,6 +2739,9 @@ exit:
 static int
 netdev_linux_delete_queue(struct netdev *netdev_, unsigned int queue_id)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     int error;
 
@@ -2663,7 +2751,7 @@ netdev_linux_delete_queue(struct netdev *netdev_, unsigned int queue_id)
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (!error) {
         if (netdev->tc->ops->class_delete) {
             struct tc_queue *queue = tc_find_queue(netdev_, queue_id);
@@ -2694,7 +2782,7 @@ netdev_linux_get_queue_stats(const struct netdev *netdev_,
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (!error) {
         if (netdev->tc->ops->class_get_stats) {
             const struct tc_queue *queue = tc_find_queue(netdev_, queue_id);
@@ -2726,12 +2814,12 @@ start_queue_dump(const struct netdev *netdev, struct queue_dump_state *state)
     struct ofpbuf request;
     struct tcmsg *tcmsg;
 
-    tcmsg = netdev_linux_tc_make_request(netdev, RTM_GETTCLASS, 0, &request);
+    tcmsg = netdev_linux_tc_make_request(netdev, RTM_GETTCLASS, 0, &request, __FUNCTION__);
     if (!tcmsg) {
         return false;
     }
     tcmsg->tcm_parent = 0;
-    nl_dump_start(&state->dump, NETLINK_ROUTE, &request);
+    nl_dump_start(&state->dump, NETLINK_ROUTE, &request, __FUNCTION__);
     ofpbuf_uninit(&request);
 
     ofpbuf_init(&state->buf, NL_DUMP_BUFSIZE);
@@ -2742,7 +2830,7 @@ static int
 finish_queue_dump(struct queue_dump_state *state)
 {
     ofpbuf_uninit(&state->buf);
-    return nl_dump_done(&state->dump);
+    return nl_dump_done(&state->dump, __FUNCTION__);
 }
 
 struct netdev_linux_queue_state {
@@ -2763,7 +2851,7 @@ netdev_linux_queue_dump_start(const struct netdev *netdev_, void **statep)
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (!error) {
         if (netdev->tc->ops->class_get) {
             struct netdev_linux_queue_state *state;
@@ -2843,7 +2931,7 @@ netdev_linux_dump_queue_stats(const struct netdev *netdev_,
         goto exit;
     }
 
-    error = tc_query_qdisc(netdev_);
+    error = tc_query_qdisc(netdev_, __FUNCTION__);
     if (!error) {
         struct queue_dump_state state;
 
@@ -2855,7 +2943,7 @@ netdev_linux_dump_queue_stats(const struct netdev *netdev_,
             struct ofpbuf msg;
             int retval;
 
-            while (nl_dump_next(&state.dump, &msg, &state.buf)) {
+            while (nl_dump_next(&state.dump, &msg, &state.buf, __FUNCTION__)) {
                 retval = netdev->tc->ops->class_dump_stats(netdev_, &msg,
                                                            cb, aux);
                 if (retval) {
@@ -2955,6 +3043,9 @@ netdev_linux_add_router(struct netdev *netdev OVS_UNUSED, struct in_addr router)
     struct in_addr any = { INADDR_ANY };
     struct rtentry rt;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     memset(&rt, 0, sizeof rt);
     make_in4_sockaddr(&rt.rt_dst, any);
@@ -3099,6 +3190,9 @@ netdev_linux_arp_lookup(const struct netdev *netdev,
     struct arpreq r;
     struct sockaddr_in sin;
     int retval;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     memset(&r, 0, sizeof r);
     memset(&sin, 0, sizeof sin);
@@ -3178,6 +3272,9 @@ netdev_linux_update_flags(struct netdev *netdev_, enum netdev_flags off,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     int error = 0;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     ovs_mutex_lock(&netdev->mutex);
     if (on || off) {
@@ -3337,6 +3434,9 @@ codel_install__(struct netdev *netdev_, uint32_t target, uint32_t limit,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct codel *codel;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     codel = xmalloc(sizeof *codel);
     tc_init(&codel->tc, &tc_ops_codel);
@@ -3356,11 +3456,14 @@ codel_setup_qdisc__(struct netdev *netdev, uint32_t target, uint32_t limit,
     struct tcmsg *tcmsg;
     uint32_t otarget, olimit, ointerval;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     tc_del_qdisc(netdev);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWQDISC,
-                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+                                         NLM_F_EXCL | NLM_F_CREATE, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
@@ -3371,14 +3474,14 @@ codel_setup_qdisc__(struct netdev *netdev, uint32_t target, uint32_t limit,
     olimit = limit ? limit : 10240;
     ointerval = interval ? interval : 100000;
 
-    nl_msg_put_string(&request, TCA_KIND, "codel");
+    nl_msg_put_string(&request, TCA_KIND, "codel", __FUNCTION__);
     opt_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
     nl_msg_put_u32(&request, TCA_CODEL_TARGET, otarget);
     nl_msg_put_u32(&request, TCA_CODEL_LIMIT, olimit);
     nl_msg_put_u32(&request, TCA_CODEL_INTERVAL, ointerval);
     nl_msg_end_nested(&request, opt_offset);
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "failed to replace %s qdisc, "
         "target %u, limit %u, interval %u error %d(%s)",
@@ -3393,6 +3496,9 @@ static void
 codel_parse_qdisc_details__(struct netdev *netdev OVS_UNUSED,
                             const struct smap *details, struct codel *codel)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     codel->target = smap_get_ullong(details, "target", 0);
     codel->limit = smap_get_ullong(details, "limit", 0);
     codel->interval = smap_get_ullong(details, "interval", 0);
@@ -3409,10 +3515,12 @@ codel_parse_qdisc_details__(struct netdev *netdev OVS_UNUSED,
 }
 
 static int
-codel_tc_install(struct netdev *netdev, const struct smap *details)
+codel_tc_install(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     int error;
     struct codel codel;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
 
     codel_parse_qdisc_details__(netdev, details, &codel);
     error = codel_setup_qdisc__(netdev, codel.target, codel.limit,
@@ -3433,6 +3541,9 @@ codel_parse_tca_options__(struct nlattr *nl_options, struct codel *codel)
     };
 
     struct nlattr *attrs[ARRAY_SIZE(tca_codel_policy)];
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     if (!nl_parse_nested(nl_options, tca_codel_policy,
                          attrs, ARRAY_SIZE(tca_codel_policy))) {
@@ -3453,8 +3564,10 @@ codel_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg)
     const char * kind;
     int error;
     struct codel codel;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
-    error = tc_parse_qdisc(nlmsg, &kind, &nlattr);
+    error = tc_parse_qdisc(nlmsg, &kind, &nlattr, __FUNCTION__);
     if (error != 0) {
         return error;
     }
@@ -3481,6 +3594,9 @@ static int
 codel_qdisc_get(const struct netdev *netdev, struct smap *details)
 {
     const struct codel *codel = codel_get__(netdev);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     smap_add_format(details, "target", "%u", codel->target);
     smap_add_format(details, "limit", "%u", codel->limit);
     smap_add_format(details, "interval", "%u", codel->interval);
@@ -3488,9 +3604,11 @@ codel_qdisc_get(const struct netdev *netdev, struct smap *details)
 }
 
 static int
-codel_qdisc_set(struct netdev *netdev, const struct smap *details)
+codel_qdisc_set(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     struct codel codel;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     codel_parse_qdisc_details__(netdev, details, &codel);
     codel_install__(netdev, codel.target, codel.limit, codel.interval);
@@ -3499,6 +3617,8 @@ codel_qdisc_set(struct netdev *netdev, const struct smap *details)
     codel_get__(netdev)->interval = codel.interval;
     return 0;
 }
+
+//ro_check: tc related
 
 static const struct tc_ops tc_ops_codel = {
     .linux_name = "codel",
@@ -3548,6 +3668,9 @@ fqcodel_install__(struct netdev *netdev_, uint32_t target, uint32_t limit,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct fqcodel *fqcodel;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     fqcodel = xmalloc(sizeof *fqcodel);
     tc_init(&fqcodel->tc, &tc_ops_fqcodel);
@@ -3569,11 +3692,14 @@ fqcodel_setup_qdisc__(struct netdev *netdev, uint32_t target, uint32_t limit,
     struct tcmsg *tcmsg;
     uint32_t otarget, olimit, ointerval, oflows,  oquantum;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     tc_del_qdisc(netdev);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWQDISC,
-                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+                                         NLM_F_EXCL | NLM_F_CREATE, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
@@ -3587,7 +3713,7 @@ fqcodel_setup_qdisc__(struct netdev *netdev, uint32_t target, uint32_t limit,
     oquantum = quantum ? quantum : 1514; /* fq_codel default quantum is 1514
                                             not mtu */
 
-    nl_msg_put_string(&request, TCA_KIND, "fq_codel");
+    nl_msg_put_string(&request, TCA_KIND, "fq_codel", __FUNCTION__);
     opt_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
     nl_msg_put_u32(&request, TCA_FQ_CODEL_TARGET, otarget);
     nl_msg_put_u32(&request, TCA_FQ_CODEL_LIMIT, olimit);
@@ -3596,7 +3722,7 @@ fqcodel_setup_qdisc__(struct netdev *netdev, uint32_t target, uint32_t limit,
     nl_msg_put_u32(&request, TCA_FQ_CODEL_QUANTUM, oquantum);
     nl_msg_end_nested(&request, opt_offset);
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "failed to replace %s qdisc, "
         "target %u, limit %u, interval %u, flows %u, quantum %u error %d(%s)",
@@ -3611,7 +3737,13 @@ static void
 fqcodel_parse_qdisc_details__(struct netdev *netdev OVS_UNUSED,
                           const struct smap *details, struct fqcodel *fqcodel)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     fqcodel->target = smap_get_ullong(details, "target", 0);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     fqcodel->limit = smap_get_ullong(details, "limit", 0);
     fqcodel->interval = smap_get_ullong(details, "interval", 0);
     fqcodel->flows = smap_get_ullong(details, "flows", 0);
@@ -3635,10 +3767,13 @@ fqcodel_parse_qdisc_details__(struct netdev *netdev OVS_UNUSED,
 }
 
 static int
-fqcodel_tc_install(struct netdev *netdev, const struct smap *details)
+fqcodel_tc_install(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     int error;
     struct fqcodel fqcodel;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
+
 
     fqcodel_parse_qdisc_details__(netdev, details, &fqcodel);
     error = fqcodel_setup_qdisc__(netdev, fqcodel.target, fqcodel.limit,
@@ -3663,6 +3798,9 @@ fqcodel_parse_tca_options__(struct nlattr *nl_options, struct fqcodel *fqcodel)
     };
 
     struct nlattr *attrs[ARRAY_SIZE(tca_fqcodel_policy)];
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     if (!nl_parse_nested(nl_options, tca_fqcodel_policy,
                          attrs, ARRAY_SIZE(tca_fqcodel_policy))) {
@@ -3685,8 +3823,11 @@ fqcodel_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg)
     const char * kind;
     int error;
     struct fqcodel fqcodel;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
-    error = tc_parse_qdisc(nlmsg, &kind, &nlattr);
+
+    error = tc_parse_qdisc(nlmsg, &kind, &nlattr, __FUNCTION__);
     if (error != 0) {
         return error;
     }
@@ -3713,6 +3854,9 @@ static int
 fqcodel_qdisc_get(const struct netdev *netdev, struct smap *details)
 {
     const struct fqcodel *fqcodel = fqcodel_get__(netdev);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     smap_add_format(details, "target", "%u", fqcodel->target);
     smap_add_format(details, "limit", "%u", fqcodel->limit);
     smap_add_format(details, "interval", "%u", fqcodel->interval);
@@ -3722,9 +3866,12 @@ fqcodel_qdisc_get(const struct netdev *netdev, struct smap *details)
 }
 
 static int
-fqcodel_qdisc_set(struct netdev *netdev, const struct smap *details)
+fqcodel_qdisc_set(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     struct fqcodel fqcodel;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 
     fqcodel_parse_qdisc_details__(netdev, details, &fqcodel);
     fqcodel_install__(netdev, fqcodel.target, fqcodel.limit, fqcodel.interval,
@@ -3768,7 +3915,13 @@ sfq_get__(const struct netdev *netdev_)
 static void
 sfq_install__(struct netdev *netdev_, uint32_t quantum, uint32_t perturb)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     struct sfq *sfq;
 
     sfq = xmalloc(sizeof *sfq);
@@ -3787,12 +3940,15 @@ sfq_setup_qdisc__(struct netdev *netdev, uint32_t quantum, uint32_t perturb)
     struct tcmsg *tcmsg;
     int mtu;
     int mtu_error, error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     mtu_error = netdev_linux_get_mtu__(netdev_linux_cast(netdev), &mtu);
 
     tc_del_qdisc(netdev);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWQDISC,
-                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+                                         NLM_F_EXCL | NLM_F_CREATE, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
@@ -3814,10 +3970,10 @@ sfq_setup_qdisc__(struct netdev *netdev, uint32_t quantum, uint32_t perturb)
         opt.perturb_period = perturb;
     }
 
-    nl_msg_put_string(&request, TCA_KIND, "sfq");
-    nl_msg_put_unspec(&request, TCA_OPTIONS, &opt, sizeof opt);
+    nl_msg_put_string(&request, TCA_KIND, "sfq", __FUNCTION__);
+    nl_msg_put_unspec(&request, TCA_OPTIONS, &opt, sizeof opt, __FUNCTION__);
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "failed to replace %s qdisc, "
                      "quantum %u, perturb %u error %d(%s)",
@@ -3832,7 +3988,13 @@ static void
 sfq_parse_qdisc_details__(struct netdev *netdev,
                           const struct smap *details, struct sfq *sfq)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     sfq->perturb = smap_get_ullong(details, "perturb", 0);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     sfq->quantum = smap_get_ullong(details, "quantum", 0);
 
     if (!sfq->perturb) {
@@ -3851,10 +4013,13 @@ sfq_parse_qdisc_details__(struct netdev *netdev,
 }
 
 static int
-sfq_tc_install(struct netdev *netdev, const struct smap *details)
+sfq_tc_install(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     int error;
     struct sfq sfq;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
+
 
     sfq_parse_qdisc_details__(netdev, details, &sfq);
     error = sfq_setup_qdisc__(netdev, sfq.quantum, sfq.perturb);
@@ -3871,8 +4036,11 @@ sfq_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg)
     struct nlattr *nlattr;
     const char * kind;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
-    error = tc_parse_qdisc(nlmsg, &kind, &nlattr);
+
+    error = tc_parse_qdisc(nlmsg, &kind, &nlattr, __FUNCTION__);
     if (error == 0) {
         sfq = nl_attr_get(nlattr);
         sfq_install__(netdev, sfq->quantum, sfq->perturb_period);
@@ -3894,15 +4062,21 @@ static int
 sfq_qdisc_get(const struct netdev *netdev, struct smap *details)
 {
     const struct sfq *sfq = sfq_get__(netdev);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     smap_add_format(details, "quantum", "%u", sfq->quantum);
     smap_add_format(details, "perturb", "%u", sfq->perturb);
     return 0;
 }
 
 static int
-sfq_qdisc_set(struct netdev *netdev, const struct smap *details)
+sfq_qdisc_set(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     struct sfq sfq;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 
     sfq_parse_qdisc_details__(netdev, details, &sfq);
     sfq_install__(netdev, sfq.quantum, sfq.perturb);
@@ -3944,6 +4118,9 @@ netem_install__(struct netdev *netdev_, uint32_t latency,
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct netem *netem;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     netem = xmalloc(sizeof *netem);
     tc_init(&netem->tc, &tc_ops_netem);
@@ -3962,11 +4139,14 @@ netem_setup_qdisc__(struct netdev *netdev, uint32_t latency,
     struct ofpbuf request;
     struct tcmsg *tcmsg;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     tc_del_qdisc(netdev);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWQDISC,
-                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+                                         NLM_F_EXCL | NLM_F_CREATE, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
@@ -3993,10 +4173,10 @@ netem_setup_qdisc__(struct netdev *netdev, uint32_t latency,
 
     opt.latency = tc_time_to_ticks(latency);
 
-    nl_msg_put_string(&request, TCA_KIND, "netem");
-    nl_msg_put_unspec(&request, TCA_OPTIONS, &opt, sizeof opt);
+    nl_msg_put_string(&request, TCA_KIND, "netem", __FUNCTION__);
+    nl_msg_put_unspec(&request, TCA_OPTIONS, &opt, sizeof opt, __FUNCTION__);
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "failed to replace %s qdisc, "
                           "latency %u, limit %u, loss %u error %d(%s)",
@@ -4011,7 +4191,13 @@ static void
 netem_parse_qdisc_details__(struct netdev *netdev OVS_UNUSED,
                           const struct smap *details, struct netem *netem)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     netem->latency = smap_get_ullong(details, "latency", 0);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     netem->limit = smap_get_ullong(details, "limit", 0);
     netem->loss = smap_get_ullong(details, "loss", 0);
 
@@ -4021,10 +4207,13 @@ netem_parse_qdisc_details__(struct netdev *netdev OVS_UNUSED,
 }
 
 static int
-netem_tc_install(struct netdev *netdev, const struct smap *details)
+netem_tc_install(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     int error;
     struct netem netem;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
+
 
     netem_parse_qdisc_details__(netdev, details, &netem);
     error = netem_setup_qdisc__(netdev, netem.latency,
@@ -4042,8 +4231,11 @@ netem_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg)
     struct nlattr *nlattr;
     const char *kind;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
-    error = tc_parse_qdisc(nlmsg, &kind, &nlattr);
+
+    error = tc_parse_qdisc(nlmsg, &kind, &nlattr, __FUNCTION__);
     if (error == 0) {
         netem = nl_attr_get(nlattr);
         netem_install__(netdev, netem->latency, netem->limit, netem->loss);
@@ -4057,6 +4249,9 @@ static void
 netem_tc_destroy(struct tc *tc)
 {
     struct netem *netem = CONTAINER_OF(tc, struct netem, tc);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     tc_destroy(tc);
     free(netem);
 }
@@ -4065,6 +4260,9 @@ static int
 netem_qdisc_get(const struct netdev *netdev, struct smap *details)
 {
     const struct netem *netem = netem_get__(netdev);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     smap_add_format(details, "latency", "%u", netem->latency);
     smap_add_format(details, "limit", "%u", netem->limit);
     smap_add_format(details, "loss", "%u", netem->loss);
@@ -4072,9 +4270,12 @@ netem_qdisc_get(const struct netdev *netdev, struct smap *details)
 }
 
 static int
-netem_qdisc_set(struct netdev *netdev, const struct smap *details)
+netem_qdisc_set(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     struct netem netem;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 
     netem_parse_qdisc_details__(netdev, details, &netem);
     netem_install__(netdev, netem.latency, netem.limit, netem.loss);
@@ -4125,6 +4326,9 @@ htb_install__(struct netdev *netdev_, uint64_t max_rate)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct htb *htb;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     htb = xmalloc(sizeof *htb);
     tc_init(&htb->tc, &tc_ops_htb);
@@ -4133,28 +4337,32 @@ htb_install__(struct netdev *netdev_, uint64_t max_rate)
     netdev->tc = &htb->tc;
 }
 
+//rolaya: 
+
 /* Create an HTB qdisc.
  *
  * Equivalent to "tc qdisc add dev <dev> root handle 1: htb default 1". */
 static int
-htb_setup_qdisc__(struct netdev *netdev)
+htb_setup_qdisc__(struct netdev *netdev, const char* caller)
 {
     size_t opt_offset;
     struct tc_htb_glob opt;
     struct ofpbuf request;
     struct tcmsg *tcmsg;
+  
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     tc_del_qdisc(netdev);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWQDISC,
-                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+                                         NLM_F_EXCL | NLM_F_CREATE, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
     tcmsg->tcm_handle = tc_make_handle(1, 0);
     tcmsg->tcm_parent = TC_H_ROOT;
 
-    nl_msg_put_string(&request, TCA_KIND, "htb");
+    nl_msg_put_string(&request, TCA_KIND, "htb", __FUNCTION__);
 
     memset(&opt, 0, sizeof opt);
     opt.rate2quantum = HTB_RATE2QUANTUM;
@@ -4162,10 +4370,10 @@ htb_setup_qdisc__(struct netdev *netdev)
     opt.defcls = 1;
 
     opt_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
-    nl_msg_put_unspec(&request, TCA_HTB_INIT, &opt, sizeof opt);
+    nl_msg_put_unspec(&request, TCA_HTB_INIT, &opt, sizeof opt, __FUNCTION__);
     nl_msg_end_nested(&request, opt_offset);
 
-    return tc_transact(&request, NULL);
+    return tc_transact(&request, NULL, __FUNCTION__);
 }
 
 /* Equivalent to "tc class replace <dev> classid <handle> parent <parent> htb
@@ -4180,6 +4388,9 @@ htb_setup_class__(struct netdev *netdev, unsigned int handle,
     struct tcmsg *tcmsg;
     int error;
     int mtu;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = netdev_linux_get_mtu__(netdev_linux_cast(netdev), &mtu);
     if (error) {
@@ -4201,21 +4412,21 @@ htb_setup_class__(struct netdev *netdev, unsigned int handle,
     opt.prio = class->priority;
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWTCLASS, NLM_F_CREATE,
-                                         &request);
+                                         &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
     tcmsg->tcm_handle = handle;
     tcmsg->tcm_parent = parent;
 
-    nl_msg_put_string(&request, TCA_KIND, "htb");
+    nl_msg_put_string(&request, TCA_KIND, "htb", __FUNCTION__);
     opt_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
-    nl_msg_put_unspec(&request, TCA_HTB_PARMS, &opt, sizeof opt);
+    nl_msg_put_unspec(&request, TCA_HTB_PARMS, &opt, sizeof opt, __FUNCTION__);
     tc_put_rtab(&request, TCA_HTB_RTAB, &opt.rate);
     tc_put_rtab(&request, TCA_HTB_CTAB, &opt.ceil);
     nl_msg_end_nested(&request, opt_offset);
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "failed to replace %s class %u:%u, parent %u:%u, "
                      "min_rate=%u max_rate=%u burst=%u prio=%u (%s)",
@@ -4242,6 +4453,9 @@ htb_parse_tca_options__(struct nlattr *nl_options, struct htb_class *class)
 
     struct nlattr *attrs[ARRAY_SIZE(tca_htb_policy)];
     const struct tc_htb_opt *htb;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     if (!nl_parse_nested(nl_options, tca_htb_policy,
                          attrs, ARRAY_SIZE(tca_htb_policy))) {
@@ -4265,6 +4479,9 @@ htb_parse_tcmsg__(struct ofpbuf *tcmsg, unsigned int *queue_id,
     struct nlattr *nl_options;
     unsigned int handle;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = tc_parse_class(tcmsg, &handle, &nl_options, stats);
     if (!error && queue_id) {
@@ -4284,9 +4501,11 @@ htb_parse_tcmsg__(struct ofpbuf *tcmsg, unsigned int *queue_id,
 
 static void
 htb_parse_qdisc_details__(struct netdev *netdev_,
-                          const struct smap *details, struct htb_class *hc)
+                          const struct smap *details, struct htb_class *hc, const char* caller)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+  
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     hc->max_rate = smap_get_ullong(details, "max-rate", 0) / 8;
     if (!hc->max_rate) {
@@ -4308,6 +4527,9 @@ htb_parse_class_details__(struct netdev *netdev,
     const struct htb *htb = htb_get__(netdev);
     int mtu, error;
     unsigned long long int max_rate_bit;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = netdev_linux_get_mtu__(netdev_linux_cast(netdev), &mtu);
     if (error) {
@@ -4353,6 +4575,9 @@ htb_query_class__(const struct netdev *netdev, unsigned int handle,
 {
     struct ofpbuf *reply;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = tc_query_class(netdev, handle, parent, &reply);
     if (!error) {
@@ -4363,21 +4588,28 @@ htb_query_class__(const struct netdev *netdev, unsigned int handle,
 }
 
 static int
-htb_tc_install(struct netdev *netdev, const struct smap *details)
+htb_tc_install(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     int error;
+  
+    VLOG_INFO("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    VLOG_INFO("%s: caller: [%s] processing started...", __FUNCTION__, caller);
 
-    error = htb_setup_qdisc__(netdev);
+    error = htb_setup_qdisc__(netdev, __FUNCTION__);
     if (!error) {
         struct htb_class hc;
 
-        htb_parse_qdisc_details__(netdev, details, &hc);
+        htb_parse_qdisc_details__(netdev, details, &hc, __FUNCTION__);
         error = htb_setup_class__(netdev, tc_make_handle(1, 0xfffe),
                                   tc_make_handle(1, 0), &hc);
         if (!error) {
             htb_install__(netdev, hc.max_rate);
         }
     }
+
+    VLOG_INFO("%s: caller: [%s] processing complete...", __FUNCTION__, caller);
+    VLOG_INFO("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+
     return error;
 }
 
@@ -4395,6 +4627,9 @@ htb_update_queue__(struct netdev *netdev, unsigned int queue_id,
     size_t hash = hash_int(queue_id, 0);
     struct tc_queue *queue;
     struct htb_class *hcp;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     queue = tc_find_queue__(netdev, queue_id, hash);
     if (queue) {
@@ -4419,6 +4654,9 @@ htb_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg OVS_UNUSED)
     struct ofpbuf msg;
     struct queue_dump_state state;
     struct htb_class hc;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     /* Get qdisc options. */
     hc.max_rate = 0;
@@ -4429,7 +4667,7 @@ htb_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg OVS_UNUSED)
     if (!start_queue_dump(netdev, &state)) {
         return ENODEV;
     }
-    while (nl_dump_next(&state.dump, &msg, &state.buf)) {
+    while (nl_dump_next(&state.dump, &msg, &state.buf, __FUNCTION__)) {
         unsigned int queue_id;
 
         if (!htb_parse_tcmsg__(&msg, &queue_id, &hc, NULL)) {
@@ -4446,6 +4684,9 @@ htb_tc_destroy(struct tc *tc)
 {
     struct htb *htb = CONTAINER_OF(tc, struct htb, tc);
     struct htb_class *hc;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     HMAP_FOR_EACH_POP (hc, tc_queue.hmap_node, &htb->tc.queues) {
         free(hc);
@@ -4458,17 +4699,23 @@ static int
 htb_qdisc_get(const struct netdev *netdev, struct smap *details)
 {
     const struct htb *htb = htb_get__(netdev);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     smap_add_format(details, "max-rate", "%llu", 8ULL * htb->max_rate);
     return 0;
 }
 
 static int
-htb_qdisc_set(struct netdev *netdev, const struct smap *details)
+htb_qdisc_set(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     struct htb_class hc;
     int error;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
-    htb_parse_qdisc_details__(netdev, details, &hc);
+
+    htb_parse_qdisc_details__(netdev, details, &hc, __FUNCTION__);
     error = htb_setup_class__(netdev, tc_make_handle(1, 0xfffe),
                               tc_make_handle(1, 0), &hc);
     if (!error) {
@@ -4482,6 +4729,9 @@ htb_class_get(const struct netdev *netdev OVS_UNUSED,
               const struct tc_queue *queue, struct smap *details)
 {
     const struct htb_class *hc = htb_class_cast__(queue);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     smap_add_format(details, "min-rate", "%llu", 8ULL * hc->min_rate);
     if (hc->min_rate != hc->max_rate) {
@@ -4500,6 +4750,9 @@ htb_class_set(struct netdev *netdev, unsigned int queue_id,
 {
     struct htb_class hc;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = htb_parse_class_details__(netdev, details, &hc);
     if (error) {
@@ -4522,6 +4775,9 @@ htb_class_delete(struct netdev *netdev, struct tc_queue *queue)
     struct htb_class *hc = htb_class_cast__(queue);
     struct htb *htb = htb_get__(netdev);
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = tc_delete_class(netdev, tc_make_handle(1, queue->queue_id + 1));
     if (!error) {
@@ -4610,6 +4866,9 @@ hfsc_install__(struct netdev *netdev_, uint32_t max_rate)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct hfsc *hfsc;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     hfsc = xmalloc(sizeof *hfsc);
     tc_init(&hfsc->tc, &tc_ops_hfsc);
@@ -4625,6 +4884,9 @@ hfsc_update_queue__(struct netdev *netdev, unsigned int queue_id,
     struct hfsc *hfsc;
     struct hfsc_class *hcp;
     struct tc_queue *queue;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     hfsc = hfsc_get__(netdev);
     hash = hash_int(queue_id, 0);
@@ -4711,6 +4973,9 @@ hfsc_parse_tcmsg__(struct ofpbuf *tcmsg, unsigned int *queue_id,
     int error;
     unsigned int handle;
     struct nlattr *nl_options;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = tc_parse_class(tcmsg, &handle, &nl_options, stats);
     if (error) {
@@ -4743,6 +5008,9 @@ hfsc_query_class__(const struct netdev *netdev, unsigned int handle,
 {
     int error;
     struct ofpbuf *reply;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = tc_query_class(netdev, handle, parent, &reply);
     if (error) {
@@ -4759,6 +5027,9 @@ hfsc_parse_qdisc_details__(struct netdev *netdev_, const struct smap *details,
                            struct hfsc_class *class)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     uint32_t max_rate = smap_get_ullong(details, "max-rate", 0) / 8;
     if (!max_rate) {
@@ -4780,6 +5051,9 @@ hfsc_parse_class_details__(struct netdev *netdev,
 {
     const struct hfsc *hfsc;
     uint32_t min_rate, max_rate;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     hfsc       = hfsc_get__(netdev);
 
@@ -4806,11 +5080,14 @@ hfsc_setup_qdisc__(struct netdev * netdev)
     struct tcmsg *tcmsg;
     struct ofpbuf request;
     struct tc_hfsc_qopt opt;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     tc_del_qdisc(netdev);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWQDISC,
-                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+                                         NLM_F_EXCL | NLM_F_CREATE, &request, __FUNCTION__);
 
     if (!tcmsg) {
         return ENODEV;
@@ -4822,10 +5099,10 @@ hfsc_setup_qdisc__(struct netdev * netdev)
     memset(&opt, 0, sizeof opt);
     opt.defcls = 1;
 
-    nl_msg_put_string(&request, TCA_KIND, "hfsc");
-    nl_msg_put_unspec(&request, TCA_OPTIONS, &opt, sizeof opt);
+    nl_msg_put_string(&request, TCA_KIND, "hfsc", __FUNCTION__);
+    nl_msg_put_unspec(&request, TCA_OPTIONS, &opt, sizeof opt, __FUNCTION__);
 
-    return tc_transact(&request, NULL);
+    return tc_transact(&request, NULL, __FUNCTION__);
 }
 
 /* Create an HFSC class.
@@ -4841,9 +5118,11 @@ hfsc_setup_class__(struct netdev *netdev, unsigned int handle,
     struct tcmsg *tcmsg;
     struct ofpbuf request;
     struct tc_service_curve min, max;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWTCLASS, NLM_F_CREATE,
-                                         &request);
+                                         &request, __FUNCTION__);
 
     if (!tcmsg) {
         return ENODEV;
@@ -4860,14 +5139,14 @@ hfsc_setup_class__(struct netdev *netdev, unsigned int handle,
     max.d  = 0;
     max.m2 = class->max_rate;
 
-    nl_msg_put_string(&request, TCA_KIND, "hfsc");
+    nl_msg_put_string(&request, TCA_KIND, "hfsc", __FUNCTION__);
     opt_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
-    nl_msg_put_unspec(&request, TCA_HFSC_RSC, &min, sizeof min);
-    nl_msg_put_unspec(&request, TCA_HFSC_FSC, &min, sizeof min);
-    nl_msg_put_unspec(&request, TCA_HFSC_USC, &max, sizeof max);
+    nl_msg_put_unspec(&request, TCA_HFSC_RSC, &min, sizeof min, __FUNCTION__);
+    nl_msg_put_unspec(&request, TCA_HFSC_FSC, &min, sizeof min, __FUNCTION__);
+    nl_msg_put_unspec(&request, TCA_HFSC_USC, &max, sizeof max, __FUNCTION__);
     nl_msg_end_nested(&request, opt_offset);
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "failed to replace %s class %u:%u, parent %u:%u, "
                      "min-rate %ubps, max-rate %ubps (%s)",
@@ -4881,10 +5160,13 @@ hfsc_setup_class__(struct netdev *netdev, unsigned int handle,
 }
 
 static int
-hfsc_tc_install(struct netdev *netdev, const struct smap *details)
+hfsc_tc_install(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     int error;
     struct hfsc_class class;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
+
 
     error = hfsc_setup_qdisc__(netdev);
 
@@ -4910,6 +5192,9 @@ hfsc_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg OVS_UNUSED)
     struct ofpbuf msg;
     struct queue_dump_state state;
     struct hfsc_class hc;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     hc.max_rate = 0;
     hfsc_query_class__(netdev, tc_make_handle(1, 0xfffe), 0, &hc, NULL);
@@ -4919,7 +5204,7 @@ hfsc_tc_load(struct netdev *netdev, struct ofpbuf *nlmsg OVS_UNUSED)
         return ENODEV;
     }
 
-    while (nl_dump_next(&state.dump, &msg, &state.buf)) {
+    while (nl_dump_next(&state.dump, &msg, &state.buf, __FUNCTION__)) {
         unsigned int queue_id;
 
         if (!hfsc_parse_tcmsg__(&msg, &queue_id, &hc, NULL)) {
@@ -4936,6 +5221,9 @@ hfsc_tc_destroy(struct tc *tc)
 {
     struct hfsc *hfsc;
     struct hfsc_class *hc, *next;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     hfsc = CONTAINER_OF(tc, struct hfsc, tc);
 
@@ -4952,16 +5240,22 @@ static int
 hfsc_qdisc_get(const struct netdev *netdev, struct smap *details)
 {
     const struct hfsc *hfsc;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     hfsc = hfsc_get__(netdev);
     smap_add_format(details, "max-rate", "%llu", 8ULL * hfsc->max_rate);
     return 0;
 }
 
 static int
-hfsc_qdisc_set(struct netdev *netdev, const struct smap *details)
+hfsc_qdisc_set(struct netdev *netdev, const struct smap *details, const char* caller)
 {
     int error;
     struct hfsc_class class;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 
     hfsc_parse_qdisc_details__(netdev, details, &class);
     error = hfsc_setup_class__(netdev, tc_make_handle(1, 0xfffe),
@@ -4979,6 +5273,9 @@ hfsc_class_get(const struct netdev *netdev OVS_UNUSED,
               const struct tc_queue *queue, struct smap *details)
 {
     const struct hfsc_class *hc;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     hc = hfsc_class_cast__(queue);
     smap_add_format(details, "min-rate", "%llu", 8ULL * hc->min_rate);
@@ -4994,6 +5291,9 @@ hfsc_class_set(struct netdev *netdev, unsigned int queue_id,
 {
     int error;
     struct hfsc_class class;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     error = hfsc_parse_class_details__(netdev, details, &class);
     if (error) {
@@ -5016,6 +5316,9 @@ hfsc_class_delete(struct netdev *netdev, struct tc_queue *queue)
     int error;
     struct hfsc *hfsc;
     struct hfsc_class *hc;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     hc   = hfsc_class_cast__(queue);
     hfsc = hfsc_get__(netdev);
@@ -5087,7 +5390,7 @@ noop_install__(struct netdev *netdev_)
 
 static int
 noop_tc_install(struct netdev *netdev,
-                   const struct smap *details OVS_UNUSED)
+                   const struct smap *details OVS_UNUSED, const char* caller OVS_UNUSED)
 {
     noop_install__(netdev);
     return 0;
@@ -5124,7 +5427,7 @@ default_install__(struct netdev *netdev_)
 
 static int
 default_tc_install(struct netdev *netdev,
-                   const struct smap *details OVS_UNUSED)
+                   const struct smap *details OVS_UNUSED, const char* caller OVS_UNUSED)
 {
     default_install__(netdev);
     return 0;
@@ -5150,6 +5453,9 @@ static const struct tc_ops tc_ops_default = {
 static int
 other_tc_load(struct netdev *netdev_, struct ofpbuf *nlmsg OVS_UNUSED)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     static const struct tc tc = TC_INITIALIZER(&tc, &tc_ops_other);
 
@@ -5190,17 +5496,19 @@ static unsigned int buffer_hz;
 
 static struct tcmsg *
 netdev_linux_tc_make_request(const struct netdev *netdev, int type,
-                             unsigned int flags, struct ofpbuf *request)
+                             unsigned int flags, struct ofpbuf *request, const char* caller)
 {
     int ifindex;
     int error;
+  
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
 
     error = get_ifindex(netdev, &ifindex);
     if (error) {
         return NULL;
     }
 
-    return tc_make_request(ifindex, type, flags, request);
+    return tc_make_request(ifindex, type, flags, request, __FUNCTION__);
 }
 
 /* Adds a policer to 'netdev' with a rate of 'kbits_rate' and a burst size
@@ -5227,6 +5535,9 @@ tc_add_policer(struct netdev *netdev,
     size_t police_offset;
     int error;
     int mtu = 65535;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     memset(&tc_police, 0, sizeof tc_police);
     tc_police.action = TC_POLICE_SHOT;
@@ -5244,7 +5555,7 @@ tc_add_policer(struct netdev *netdev,
         tc_police.rate.rate, MIN(UINT32_MAX / 1024, kbits_burst) * 1024 / 8);
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_NEWTFILTER,
-                                         NLM_F_EXCL | NLM_F_CREATE, &request);
+                                         NLM_F_EXCL | NLM_F_CREATE, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
@@ -5252,15 +5563,15 @@ tc_add_policer(struct netdev *netdev,
     tcmsg->tcm_info = tc_make_handle(49,
                                      (OVS_FORCE uint16_t) htons(ETH_P_ALL));
 
-    nl_msg_put_string(&request, TCA_KIND, "basic");
+    nl_msg_put_string(&request, TCA_KIND, "basic", __FUNCTION__);
     basic_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
     police_offset = nl_msg_start_nested(&request, TCA_BASIC_POLICE);
-    nl_msg_put_unspec(&request, TCA_POLICE_TBF, &tc_police, sizeof tc_police);
+    nl_msg_put_unspec(&request, TCA_POLICE_TBF, &tc_police, sizeof tc_police, __FUNCTION__);
     tc_put_rtab(&request, TCA_POLICE_RATE, &tc_police.rate);
     nl_msg_end_nested(&request, police_offset);
     nl_msg_end_nested(&request, basic_offset);
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         return error;
     }
@@ -5395,13 +5706,15 @@ tc_time_to_ticks(uint32_t time) {
  * Returns 0 if successful, otherwise a positive errno value. */
 static int
 tc_parse_qdisc(const struct ofpbuf *msg, const char **kind,
-               struct nlattr **options)
+               struct nlattr **options, const char* caller)
 {
     static const struct nl_policy tca_policy[] = {
         [TCA_KIND] = { .type = NL_A_STRING, .optional = false },
         [TCA_OPTIONS] = { .type = NL_A_NESTED, .optional = true },
     };
     struct nlattr *ta[ARRAY_SIZE(tca_policy)];
+  
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     if (!nl_policy_parse(msg, NLMSG_HDRLEN + sizeof(struct tcmsg),
                          tca_policy, ta, ARRAY_SIZE(ta))) {
@@ -5444,6 +5757,9 @@ tc_parse_class(const struct ofpbuf *msg, unsigned int *handlep,
         [TCA_STATS2] = { .type = NL_A_NESTED, .optional = false },
     };
     struct nlattr *ta[ARRAY_SIZE(tca_policy)];
+
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (!nl_policy_parse(msg, NLMSG_HDRLEN + sizeof(struct tcmsg),
                          tca_policy, ta, ARRAY_SIZE(ta))) {
@@ -5514,16 +5830,19 @@ tc_query_class(const struct netdev *netdev,
     struct ofpbuf request;
     struct tcmsg *tcmsg;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     tcmsg = netdev_linux_tc_make_request(netdev, RTM_GETTCLASS, NLM_F_ECHO,
-                                         &request);
+                                         &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
     tcmsg->tcm_handle = handle;
     tcmsg->tcm_parent = parent;
 
-    error = tc_transact(&request, replyp);
+    error = tc_transact(&request, replyp, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "query %s class %u:%u (parent %u:%u) failed (%s)",
                      netdev_get_name(netdev),
@@ -5541,15 +5860,18 @@ tc_delete_class(const struct netdev *netdev, unsigned int handle)
     struct ofpbuf request;
     struct tcmsg *tcmsg;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
-    tcmsg = netdev_linux_tc_make_request(netdev, RTM_DELTCLASS, 0, &request);
+
+    tcmsg = netdev_linux_tc_make_request(netdev, RTM_DELTCLASS, 0, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
     tcmsg->tcm_handle = handle;
     tcmsg->tcm_parent = 0;
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         VLOG_WARN_RL(&rl, "delete %s class %u:%u failed (%s)",
                      netdev_get_name(netdev),
@@ -5567,15 +5889,18 @@ tc_del_qdisc(struct netdev *netdev_)
     struct ofpbuf request;
     struct tcmsg *tcmsg;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
-    tcmsg = netdev_linux_tc_make_request(netdev_, RTM_DELQDISC, 0, &request);
+
+    tcmsg = netdev_linux_tc_make_request(netdev_, RTM_DELQDISC, 0, &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
     tcmsg->tcm_handle = tc_make_handle(1, 0);
     tcmsg->tcm_parent = TC_H_ROOT;
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error == EINVAL) {
         /* EINVAL probably means that the default qdisc was in use, in which
          * case we've accomplished our purpose. */
@@ -5595,6 +5920,9 @@ getqdisc_is_safe(void)
 {
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
     static bool safe = false;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     if (ovsthread_once_start(&once)) {
         struct utsname utsname;
@@ -5619,7 +5947,7 @@ getqdisc_is_safe(void)
  * kernel to determine what they are.  Returns 0 if successful, otherwise a
  * positive errno value. */
 static int
-tc_query_qdisc(const struct netdev *netdev_)
+tc_query_qdisc(const struct netdev *netdev_, const char* caller)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
     struct ofpbuf request, *qdisc;
@@ -5627,6 +5955,8 @@ tc_query_qdisc(const struct netdev *netdev_)
     struct tcmsg *tcmsg;
     int load_error;
     int error;
+  
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     if (netdev->tc) {
         return 0;
@@ -5650,7 +5980,7 @@ tc_query_qdisc(const struct netdev *netdev_)
      * builtin qdisc is in use (which is later caught by "!error &&
      * !qdisc->size"). */
     tcmsg = netdev_linux_tc_make_request(netdev_, RTM_GETQDISC, NLM_F_ECHO,
-                                         &request);
+                                         &request, __FUNCTION__);
     if (!tcmsg) {
         return ENODEV;
     }
@@ -5658,11 +5988,11 @@ tc_query_qdisc(const struct netdev *netdev_)
     tcmsg->tcm_parent = getqdisc_is_safe() ? TC_H_ROOT : 0;
 
     /* Figure out what tc class to instantiate. */
-    error = tc_transact(&request, &qdisc);
+    error = tc_transact(&request, &qdisc, __FUNCTION__);
     if (!error && qdisc->size) {
         const char *kind;
 
-        error = tc_parse_qdisc(qdisc, &kind, NULL);
+        error = tc_parse_qdisc(qdisc, &kind, NULL, __FUNCTION__);
         if (error) {
             ops = &tc_ops_other;
         } else {
@@ -5725,6 +6055,9 @@ tc_calc_cell_log(unsigned int mtu)
 static void
 tc_fill_rate(struct tc_ratespec *rate, uint64_t Bps, int mtu)
 {
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     memset(rate, 0, sizeof *rate);
     rate->cell_log = tc_calc_cell_log(mtu);
     /* rate->overhead = 0; */           /* New in 2.6.24, not yet in some */
@@ -5742,6 +6075,9 @@ tc_put_rtab(struct ofpbuf *msg, uint16_t type, const struct tc_ratespec *rate)
 {
     uint32_t *rtab;
     unsigned int i;
+
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
 
     rtab = nl_msg_put_unspec_uninit(msg, type, TC_RTAB_SIZE);
     for (i = 0; i < TC_RTAB_SIZE / sizeof *rtab; i++) {
@@ -5883,6 +6219,9 @@ get_stats_via_netlink(const struct netdev *netdev_, struct netdev_stats *stats)
     struct ofpbuf *reply;
     int error;
 
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     /* Filtering all counters by default */
     memset(stats, 0xFF, sizeof(struct netdev_stats));
 
@@ -5891,8 +6230,8 @@ get_stats_via_netlink(const struct netdev *netdev_, struct netdev_stats *stats)
                         sizeof(struct ifinfomsg) + NL_ATTR_SIZE(IFNAMSIZ),
                         RTM_GETLINK, NLM_F_REQUEST);
     ofpbuf_put_zeros(&request, sizeof(struct ifinfomsg));
-    nl_msg_put_string(&request, IFLA_IFNAME, netdev_get_name(netdev_));
-    error = nl_transact(NETLINK_ROUTE, &request, &reply);
+    nl_msg_put_string(&request, IFLA_IFNAME, netdev_get_name(netdev_), __FUNCTION__);
+    error = nl_transact(NETLINK_ROUTE, &request, &reply, __FUNCTION__);
     ofpbuf_uninit(&request);
     if (error) {
         return error;
@@ -6004,6 +6343,9 @@ netdev_linux_update_via_netlink(struct netdev_linux *netdev)
     struct rtnetlink_change *change = &chg;
     int error;
 
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
     ofpbuf_init(&request, 0);
     nl_msg_put_nlmsghdr(&request,
                         sizeof(struct ifinfomsg) + NL_ATTR_SIZE(IFNAMSIZ) +
@@ -6013,11 +6355,11 @@ netdev_linux_update_via_netlink(struct netdev_linux *netdev)
     /* The correct identifiers for a Linux device are netnsid and ifindex,
      * but ifindex changes as the port is moved to another network namespace
      * and the interface name statically stored in ovsdb. */
-    nl_msg_put_string(&request, IFLA_IFNAME, netdev_get_name(&netdev->up));
+    nl_msg_put_string(&request, IFLA_IFNAME, netdev_get_name(&netdev->up), __FUNCTION__);
     if (netdev_linux_netnsid_is_remote(netdev)) {
         nl_msg_put_u32(&request, IFLA_IF_NETNSID, netdev->netnsid);
     }
-    error = nl_transact(NETLINK_ROUTE, &request, &reply);
+    error = nl_transact(NETLINK_ROUTE, &request, &reply, __FUNCTION__);
     ofpbuf_uninit(&request);
     if (error) {
         ofpbuf_delete(reply);
@@ -6107,6 +6449,9 @@ set_etheraddr(const char *netdev_name, const struct eth_addr mac)
 {
     struct ifreq ifr;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     memset(&ifr, 0, sizeof ifr);
     ovs_strzcpy(ifr.ifr_name, netdev_name, sizeof ifr.ifr_name);
@@ -6127,6 +6472,9 @@ netdev_linux_do_ethtool(const char *name, struct ethtool_cmd *ecmd,
 {
     struct ifreq ifr;
     int error;
+  
+VLOG_INFO("%s: processing...", __FUNCTION__);
+
 
     memset(&ifr, 0, sizeof ifr);
     ovs_strzcpy(ifr.ifr_name, name, sizeof ifr.ifr_name);

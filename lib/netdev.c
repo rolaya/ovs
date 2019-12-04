@@ -1665,7 +1665,7 @@ netdev_get_qos(const struct netdev *netdev,
  * details. */
 int
 netdev_set_qos(struct netdev *netdev,
-               const char *type, const struct smap *details)
+               const char *type, const struct smap *details, const char* caller)
 {
     const struct netdev_class *class = netdev->netdev_class;
 
@@ -1673,12 +1673,14 @@ netdev_set_qos(struct netdev *netdev,
         type = "";
     }
 
+    VLOG_INFO("%s: type: [%s] caller: [%s]...", __FUNCTION__, type, caller);
+
     if (class->set_qos) {
         if (!details) {
             static const struct smap empty = SMAP_INITIALIZER(&empty);
             details = &empty;
         }
-        return class->set_qos(netdev, type, details);
+        return class->set_qos(netdev, type, details, __FUNCTION__);
     } else {
         return *type ? EOPNOTSUPP : 0;
     }

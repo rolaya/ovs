@@ -28,6 +28,7 @@
 #include "unaligned.h"
 #include "openvswitch/vlog.h"
 #include "util.h"
+#include "debug.h"
 
 VLOG_DEFINE_THIS_MODULE(netlink);
 
@@ -238,9 +239,13 @@ nl_msg_put_unspec_zero(struct ofpbuf *msg, uint16_t type, size_t size)
  * its data if necessary. */
 void
 nl_msg_put_unspec(struct ofpbuf *msg, uint16_t type,
-                  const void *data, size_t size)
+                  const void *data, size_t size, const char* caller)
 {
     void *ptr;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
+    LogBuffer("", (const uint8_t*)data, (size_t)size);
 
     ptr = nl_msg_put_unspec_uninit(msg, type, size);
     nullable_memcpy(ptr, data, size);
@@ -252,7 +257,7 @@ nl_msg_put_unspec(struct ofpbuf *msg, uint16_t type,
 void
 nl_msg_put_flag(struct ofpbuf *msg, uint16_t type)
 {
-    nl_msg_put_unspec(msg, type, NULL, 0);
+    nl_msg_put_unspec(msg, type, NULL, 0, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 8-bit 'value'
@@ -260,7 +265,7 @@ nl_msg_put_flag(struct ofpbuf *msg, uint16_t type)
 void
 nl_msg_put_u8(struct ofpbuf *msg, uint16_t type, uint8_t value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 16-bit host
@@ -268,7 +273,7 @@ nl_msg_put_u8(struct ofpbuf *msg, uint16_t type, uint8_t value)
 void
 nl_msg_put_u16(struct ofpbuf *msg, uint16_t type, uint16_t value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 32-bit host
@@ -276,7 +281,7 @@ nl_msg_put_u16(struct ofpbuf *msg, uint16_t type, uint16_t value)
 void
 nl_msg_put_u32(struct ofpbuf *msg, uint16_t type, uint32_t value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 64-bit host
@@ -284,7 +289,7 @@ nl_msg_put_u32(struct ofpbuf *msg, uint16_t type, uint32_t value)
 void
 nl_msg_put_u64(struct ofpbuf *msg, uint16_t type, uint64_t value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 128-bit host
@@ -292,7 +297,7 @@ nl_msg_put_u64(struct ofpbuf *msg, uint16_t type, uint64_t value)
 void
 nl_msg_put_u128(struct ofpbuf *msg, uint16_t type, ovs_u128 value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 16-bit network
@@ -300,7 +305,7 @@ nl_msg_put_u128(struct ofpbuf *msg, uint16_t type, ovs_u128 value)
 void
 nl_msg_put_be16(struct ofpbuf *msg, uint16_t type, ovs_be16 value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 32-bit network
@@ -308,7 +313,7 @@ nl_msg_put_be16(struct ofpbuf *msg, uint16_t type, ovs_be16 value)
 void
 nl_msg_put_be32(struct ofpbuf *msg, uint16_t type, ovs_be32 value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 64-bit network
@@ -316,7 +321,7 @@ nl_msg_put_be32(struct ofpbuf *msg, uint16_t type, ovs_be32 value)
 void
 nl_msg_put_be64(struct ofpbuf *msg, uint16_t type, ovs_be64 value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given 128-bit
@@ -324,7 +329,7 @@ nl_msg_put_be64(struct ofpbuf *msg, uint16_t type, ovs_be64 value)
 void
 nl_msg_put_be128(struct ofpbuf *msg, uint16_t type, ovs_be128 value)
 {
-    nl_msg_put_unspec(msg, type, &value, sizeof value);
+    nl_msg_put_unspec(msg, type, &value, sizeof value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given IPv6
@@ -333,7 +338,7 @@ void
 nl_msg_put_in6_addr(struct ofpbuf *msg, uint16_t type,
                     const struct in6_addr *value)
 {
-    nl_msg_put_unspec(msg, type, value, sizeof *value);
+    nl_msg_put_unspec(msg, type, value, sizeof *value, __FUNCTION__);
 }
 
 /* Appends a Netlink attribute of the given 'type' and the given odp_port_t
@@ -359,9 +364,11 @@ nl_msg_put_string__(struct ofpbuf *msg, uint16_t type, const char *value,
 /* Appends a Netlink attribute of the given 'type' and the given
  * null-terminated string 'value' to 'msg'. */
 void
-nl_msg_put_string(struct ofpbuf *msg, uint16_t type, const char *value)
+nl_msg_put_string(struct ofpbuf *msg, uint16_t type, const char *value, const char* caller)
 {
-    nl_msg_put_unspec(msg, type, value, strlen(value) + 1);
+  VLOG_INFO("%s: caller: [%s] type: [%s] [0x%04x] value: [%s]...", __FUNCTION__, caller, tca_to_string(type), type, value); 
+ 
+   nl_msg_put_unspec(msg, type, value, strlen(value) + 1, __FUNCTION__);
 }
 
 /* Prepends a Netlink attribute of the given 'type' and room for 'size' bytes

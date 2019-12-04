@@ -38,6 +38,7 @@
 #include "socket-util.h"
 #include "util.h"
 #include "openvswitch/vlog.h"
+#include "debug.h"
 
 VLOG_DEFINE_THIS_MODULE(netlink_socket);
 
@@ -106,14 +107,14 @@ struct nl_sock {
  * Initialized by nl_sock_create(). */
 static int max_iovs;
 
-static int nl_pool_alloc(int protocol, struct nl_sock **sockp);
-static void nl_pool_release(struct nl_sock *);
+static int nl_pool_alloc(int protocol, struct nl_sock **sockp, const char* caller);
+static void nl_pool_release(struct nl_sock *, const char* caller);
 
 /* Creates a new netlink socket for the given netlink 'protocol'
  * (NETLINK_ROUTE, NETLINK_GENERIC, ...).  Returns 0 and sets '*sockp' to the
  * new socket if successful, otherwise returns a positive errno value. */
 int
-nl_sock_create(int protocol, struct nl_sock **sockp)
+nl_sock_create(int protocol, struct nl_sock **sockp, const char* caller)
 {
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
     struct nl_sock *sock;
@@ -123,6 +124,8 @@ nl_sock_create(int protocol, struct nl_sock **sockp)
     socklen_t local_size;
     int rcvbuf;
     int retval = 0;
+
+    VLOG_INFO("%s: caller: [%s] protocol: [%s] [%d]...", __FUNCTION__, caller, netlink_to_string(protocol), protocol);
 
     if (ovsthread_once_start(&once)) {
         int save_errno = errno;
@@ -230,6 +233,9 @@ nl_sock_create(int protocol, struct nl_sock **sockp)
     sock->pid = local.nl_pid;
 #endif
 
+    VLOG_INFO("%s: caller: [%s] protocol: [%s] [%d] sock->pid: [%u] [0x%08x]...", 
+        __FUNCTION__, caller, netlink_to_string(protocol), protocol, sock->pid, sock->pid);
+
     *sockp = sock;
     return 0;
 
@@ -260,15 +266,19 @@ error:
  * sets '*sockp' to the new socket if successful, otherwise returns a positive
  * errno value.  */
 int
-nl_sock_clone(const struct nl_sock *src, struct nl_sock **sockp)
+nl_sock_clone(const struct nl_sock *src, struct nl_sock **sockp, const char* caller)
 {
-    return nl_sock_create(src->protocol, sockp);
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
+    return nl_sock_create(src->protocol, sockp, __FUNCTION__);
 }
 
 /* Destroys netlink socket 'sock'. */
 void
-nl_sock_destroy(struct nl_sock *sock)
+nl_sock_destroy(struct nl_sock *sock, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     if (sock) {
 #ifdef _WIN32
         if (sock->overlapped.hEvent) {
@@ -419,8 +429,10 @@ nl_sock_mcgroup(struct nl_sock *sock, unsigned int multicast_group, bool join)
  * It is not an error to attempt to join a multicast group to which a socket
  * already belongs. */
 int
-nl_sock_join_mcgroup(struct nl_sock *sock, unsigned int multicast_group)
+nl_sock_join_mcgroup(struct nl_sock *sock, unsigned int multicast_group, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 #ifdef _WIN32
     /* Set the socket type as a "multicast" socket */
     sock->read_ioctl = OVS_IOCTL_READ_EVENT;
@@ -451,10 +463,12 @@ nl_sock_join_mcgroup(struct nl_sock *sock, unsigned int multicast_group)
  *
  * Returns 0 if successful, otherwise a positive errno.  */
 int
-nl_sock_listen_all_nsid(struct nl_sock *sock, bool enable)
+nl_sock_listen_all_nsid(struct nl_sock *sock, bool enable, const char* caller)
 {
     int error;
     int val = enable ? 1 : 0;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
 #ifndef _WIN32
     if (setsockopt(sock->fd, SOL_NETLINK, NETLINK_LISTEN_ALL_NSID, &val,
@@ -542,8 +556,10 @@ nl_sock_unsubscribe_packets(struct nl_sock *sock)
  * On success, reading from 'sock' will still return any messages that were
  * received on 'multicast_group' before the group was left. */
 int
-nl_sock_leave_mcgroup(struct nl_sock *sock, unsigned int multicast_group)
+nl_sock_leave_mcgroup(struct nl_sock *sock, unsigned int multicast_group, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 #ifdef _WIN32
     int error = nl_sock_mcgroup(sock, multicast_group, false);
     if (error) {
@@ -565,8 +581,10 @@ nl_sock_leave_mcgroup(struct nl_sock *sock, unsigned int multicast_group)
 
 static int
 nl_sock_send__(struct nl_sock *sock, const struct ofpbuf *msg,
-               uint32_t nlmsg_seq, bool wait)
+               uint32_t nlmsg_seq, bool wait, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     struct nlmsghdr *nlmsg = nl_msg_nlmsghdr(msg);
     int error;
 
@@ -591,7 +609,7 @@ nl_sock_send__(struct nl_sock *sock, const struct ofpbuf *msg,
             retval = msg->size;
         }
 #else
-        retval = send(sock->fd, msg->data, msg->size,
+        retval = SOCK_SEND(sock->fd, msg->data, msg->size,
                       wait ? 0 : MSG_DONTWAIT);
 #endif
         error = retval < 0 ? errno : 0;
@@ -612,9 +630,11 @@ nl_sock_send__(struct nl_sock *sock, const struct ofpbuf *msg,
  * 'wait' is true, then the send will wait until buffer space is ready;
  * otherwise, returns EAGAIN if the 'sock' send buffer is full. */
 int
-nl_sock_send(struct nl_sock *sock, const struct ofpbuf *msg, bool wait)
+nl_sock_send(struct nl_sock *sock, const struct ofpbuf *msg, bool wait, const char* caller)
 {
-    return nl_sock_send_seq(sock, msg, nl_sock_allocate_seq(sock, 1), wait);
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
+    return nl_sock_send_seq(sock, msg, nl_sock_allocate_seq(sock, 1), wait, __FUNCTION__);
 }
 
 /* Tries to send 'msg', which must contain a Netlink message, to the kernel on
@@ -630,13 +650,15 @@ nl_sock_send(struct nl_sock *sock, const struct ofpbuf *msg, bool wait)
  * with sequence number 'nlmsg_seq'.  Otherwise, use nl_sock_send() instead. */
 int
 nl_sock_send_seq(struct nl_sock *sock, const struct ofpbuf *msg,
-                 uint32_t nlmsg_seq, bool wait)
+                 uint32_t nlmsg_seq, bool wait, const char* caller)
 {
-    return nl_sock_send__(sock, msg, nlmsg_seq, wait);
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
+    return nl_sock_send__(sock, msg, nlmsg_seq, wait, __FUNCTION__);
 }
 
 static int
-nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, int *nsid, bool wait)
+nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, int *nsid, bool wait, const char* caller)
 {
     /* We can't accurately predict the size of the data to be received.  The
      * caller is supposed to have allocated enough space in 'buf' to handle the
@@ -652,6 +674,8 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, int *nsid, bool wait)
     ssize_t retval;
     int *ptr;
     int error;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     ovs_assert(buf->allocated >= sizeof *nlmsghdr);
     ofpbuf_clear(buf);
@@ -800,16 +824,20 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, int *nsid, bool wait)
  * Regardless of success or failure, this function resets 'buf''s headroom to
  * 0. */
 int
-nl_sock_recv(struct nl_sock *sock, struct ofpbuf *buf, int *nsid, bool wait)
+nl_sock_recv(struct nl_sock *sock, struct ofpbuf *buf, int *nsid, bool wait, const char* caller)
 {
-    return nl_sock_recv__(sock, buf, nsid, wait);
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
+    return nl_sock_recv__(sock, buf, nsid, wait, __FUNCTION__);
 }
 
 static void
 nl_sock_record_errors__(struct nl_transaction **transactions, size_t n,
-                        int error)
+                        int error, const char* caller)
 {
     size_t i;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     for (i = 0; i < n; i++) {
         struct nl_transaction *txn = transactions[i];
@@ -824,7 +852,7 @@ nl_sock_record_errors__(struct nl_transaction **transactions, size_t n,
 static int
 nl_sock_transact_multiple__(struct nl_sock *sock,
                             struct nl_transaction **transactions, size_t n,
-                            size_t *done)
+                            size_t *done, const char* caller)
 {
     uint64_t tmp_reply_stub[1024 / 8];
     struct nl_transaction tmp_txn;
@@ -835,6 +863,8 @@ nl_sock_transact_multiple__(struct nl_sock *sock,
     struct msghdr msg;
     int error;
     int i;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     base_seq = nl_sock_allocate_seq(sock, n);
     *done = 0;
@@ -855,7 +885,7 @@ nl_sock_transact_multiple__(struct nl_sock *sock,
     msg.msg_iov = iovs;
     msg.msg_iovlen = n;
     do {
-        error = sendmsg(sock->fd, &msg, 0) < 0 ? errno : 0;
+        error = SOCK_SENDMSG(sock->fd, &msg, 0) < 0 ? errno : 0;
     } while (error == EINTR);
 
     for (i = 0; i < n; i++) {
@@ -891,10 +921,10 @@ nl_sock_transact_multiple__(struct nl_sock *sock,
         }
 
         /* Receive a reply. */
-        error = nl_sock_recv__(sock, buf_txn->reply, NULL, false);
+        error = nl_sock_recv__(sock, buf_txn->reply, NULL, false, __FUNCTION__);
         if (error) {
             if (error == EAGAIN) {
-                nl_sock_record_errors__(transactions, n, 0);
+                nl_sock_record_errors__(transactions, n, 0, __FUNCTION__);
                 *done += n;
                 error = 0;
             }
@@ -932,7 +962,7 @@ nl_sock_transact_multiple__(struct nl_sock *sock,
         /* Fill in the results for transactions before 'txn'.  (We have to do
          * this after the results for 'txn' itself because of the buffer swap
          * above.) */
-        nl_sock_record_errors__(transactions, i, 0);
+        nl_sock_record_errors__(transactions, i, 0, __FUNCTION__);
 
         /* Advance. */
         *done += i + 1;
@@ -1036,10 +1066,12 @@ nl_sock_transact_multiple__(struct nl_sock *sock,
 
 static void
 nl_sock_transact_multiple(struct nl_sock *sock,
-                          struct nl_transaction **transactions, size_t n)
+                          struct nl_transaction **transactions, size_t n, const char* caller)
 {
     int max_batch_count;
     int error;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     if (!n) {
         return;
@@ -1076,7 +1108,7 @@ nl_sock_transact_multiple(struct nl_sock *sock,
             bytes += transactions[count]->request->size;
         }
 
-        error = nl_sock_transact_multiple__(sock, transactions, count, &done);
+        error = nl_sock_transact_multiple__(sock, transactions, count, &done, __FUNCTION__);
         transactions += done;
         n -= done;
 
@@ -1084,7 +1116,7 @@ nl_sock_transact_multiple(struct nl_sock *sock,
             VLOG_DBG_RL(&rl, "receive buffer overflow, resending request");
         } else if (error) {
             VLOG_ERR_RL(&rl, "transaction error (%s)", ovs_strerror(error));
-            nl_sock_record_errors__(transactions, n, error);
+            nl_sock_record_errors__(transactions, n, error, __FUNCTION__);
             if (error != EAGAIN) {
                 /* A fatal error has occurred.  Abort the rest of
                  * transactions. */
@@ -1096,16 +1128,18 @@ nl_sock_transact_multiple(struct nl_sock *sock,
 
 static int
 nl_sock_transact(struct nl_sock *sock, const struct ofpbuf *request,
-                 struct ofpbuf **replyp)
+                 struct ofpbuf **replyp, const char* caller)
 {
     struct nl_transaction *transactionp;
     struct nl_transaction transaction;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     transaction.request = CONST_CAST(struct ofpbuf *, request);
     transaction.reply = replyp ? ofpbuf_new(1024) : NULL;
     transactionp = &transaction;
 
-    nl_sock_transact_multiple(sock, &transactionp, 1);
+    nl_sock_transact_multiple(sock, &transactionp, 1, __FUNCTION__);
 
     if (replyp) {
         if (transaction.error) {
@@ -1121,8 +1155,10 @@ nl_sock_transact(struct nl_sock *sock, const struct ofpbuf *request,
 
 /* Drain all the messages currently in 'sock''s receive queue. */
 int
-nl_sock_drain(struct nl_sock *sock)
+nl_sock_drain(struct nl_sock *sock, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 #ifdef _WIN32
     return 0;
 #else
@@ -1147,31 +1183,35 @@ nl_sock_drain(struct nl_sock *sock)
  * The caller must eventually destroy 'request'.
  */
 void
-nl_dump_start(struct nl_dump *dump, int protocol, const struct ofpbuf *request)
+nl_dump_start(struct nl_dump *dump, int protocol, const struct ofpbuf *request, const char* caller)
 {
     nl_msg_nlmsghdr(request)->nlmsg_flags |= NLM_F_DUMP | NLM_F_ACK;
 
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     ovs_mutex_init(&dump->mutex);
     ovs_mutex_lock(&dump->mutex);
-    dump->status = nl_pool_alloc(protocol, &dump->sock);
+    dump->status = nl_pool_alloc(protocol, &dump->sock, __FUNCTION__);
     if (!dump->status) {
         dump->status = nl_sock_send__(dump->sock, request,
                                       nl_sock_allocate_seq(dump->sock, 1),
-                                      true);
+                                      true, __FUNCTION__);
     }
     dump->nl_seq = nl_msg_nlmsghdr(request)->nlmsg_seq;
     ovs_mutex_unlock(&dump->mutex);
 }
 
 static int
-nl_dump_refill(struct nl_dump *dump, struct ofpbuf *buffer)
+nl_dump_refill(struct nl_dump *dump, struct ofpbuf *buffer, const char* caller)
     OVS_REQUIRES(dump->mutex)
 {
     struct nlmsghdr *nlmsghdr;
     int error;
 
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     while (!buffer->size) {
-        error = nl_sock_recv__(dump->sock, buffer, NULL, false);
+        error = nl_sock_recv__(dump->sock, buffer, NULL, false, __FUNCTION__);
         if (error) {
             /* The kernel never blocks providing the results of a dump, so
              * error == EAGAIN means that we've read the whole thing, and
@@ -1202,8 +1242,10 @@ nl_dump_refill(struct nl_dump *dump, struct ofpbuf *buffer)
 }
 
 static int
-nl_dump_next__(struct ofpbuf *reply, struct ofpbuf *buffer)
+nl_dump_next__(struct ofpbuf *reply, struct ofpbuf *buffer, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     struct nlmsghdr *nlmsghdr = nl_msg_next(buffer, reply);
     if (!nlmsghdr) {
         VLOG_WARN_RL(&rl, "netlink dump contains message fragment");
@@ -1236,9 +1278,11 @@ nl_dump_next__(struct ofpbuf *reply, struct ofpbuf *buffer)
  * process replies in their buffers, but they will not fetch more replies.
  */
 bool
-nl_dump_next(struct nl_dump *dump, struct ofpbuf *reply, struct ofpbuf *buffer)
+nl_dump_next(struct nl_dump *dump, struct ofpbuf *reply, struct ofpbuf *buffer, const char* caller)
 {
     int retval = 0;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     /* If the buffer is empty, refill it.
      *
@@ -1254,7 +1298,7 @@ nl_dump_next(struct nl_dump *dump, struct ofpbuf *reply, struct ofpbuf *buffer)
              * next recv on that socket, which could be anywhere due to the way
              * that we pool Netlink sockets.  Serializing the recv calls avoids
              * the issue. */
-            dump->status = nl_dump_refill(dump, buffer);
+            dump->status = nl_dump_refill(dump, buffer, __FUNCTION__);
         }
         retval = dump->status;
         ovs_mutex_unlock(&dump->mutex);
@@ -1262,7 +1306,7 @@ nl_dump_next(struct nl_dump *dump, struct ofpbuf *reply, struct ofpbuf *buffer)
 
     /* Fetch the next message from the buffer. */
     if (!retval) {
-        retval = nl_dump_next__(reply, buffer);
+        retval = nl_dump_next__(reply, buffer, __FUNCTION__);
         if (retval) {
             /* Record 'retval' as the dump status, but don't overwrite an error
              * with EOF.  */
@@ -1285,9 +1329,11 @@ nl_dump_next(struct nl_dump *dump, struct ofpbuf *reply, struct ofpbuf *buffer)
  * with nl_dump_start().  Returns 0 if the dump operation was error-free,
  * otherwise a positive errno value describing the problem. */
 int
-nl_dump_done(struct nl_dump *dump)
+nl_dump_done(struct nl_dump *dump, const char* caller)
 {
     int status;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     ovs_mutex_lock(&dump->mutex);
     status = dump->status;
@@ -1302,7 +1348,7 @@ nl_dump_done(struct nl_dump *dump)
         struct ofpbuf reply, buf;
 
         ofpbuf_use_stub(&buf, tmp_reply_stub, sizeof tmp_reply_stub);
-        while (nl_dump_next(dump, &reply, &buf)) {
+        while (nl_dump_next(dump, &reply, &buf, __FUNCTION__)) {
             /* Nothing to do. */
         }
         ofpbuf_uninit(&buf);
@@ -1313,7 +1359,7 @@ nl_dump_done(struct nl_dump *dump)
         ovs_assert(status);
     }
 
-    nl_pool_release(dump->sock);
+    nl_pool_release(dump->sock, __FUNCTION__);
     ovs_mutex_destroy(&dump->mutex);
 
     return status == EOF ? 0 : status;
@@ -1384,8 +1430,10 @@ done:
  * a OR'd combination of POLLIN, POLLOUT, etc.) occur on 'sock'.
  * On Windows, 'sock' is not treated as const, and may be modified. */
 void
-nl_sock_wait(const struct nl_sock *sock, short int events)
+nl_sock_wait(const struct nl_sock *sock, short int events, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
 #ifdef _WIN32
     if (sock->overlapped.Internal != STATUS_PENDING) {
         int ret = pend_io_request(CONST_CAST(struct nl_sock *, sock));
@@ -1411,16 +1459,21 @@ nl_sock_wait(const struct nl_sock *sock, short int events)
  * transactions, and dumps.  If 'sock' is used only for notifications and
  * transactions (and never for dump) then the usage is safe. */
 int
-nl_sock_fd(const struct nl_sock *sock)
+nl_sock_fd(const struct nl_sock *sock, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     return sock->fd;
 }
 #endif
 
 /* Returns the PID associated with this socket. */
 uint32_t
-nl_sock_pid(const struct nl_sock *sock)
+nl_sock_pid(const struct nl_sock *sock, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s] protocol: [%s] sock->fd: [%d] sock->pid: [%u] [0x%08x]...", 
+        __FUNCTION__, caller, netlink_to_string(sock->protocol), sock->fd, sock->pid, sock->pid);
+
     return sock->pid;
 }
 
@@ -1492,7 +1545,7 @@ do_lookup_genl_family(const char *name, struct nlattr **attrs,
     int error;
 
     *replyp = NULL;
-    error = nl_sock_create(NETLINK_GENERIC, &sock);
+    error = nl_sock_create(NETLINK_GENERIC, &sock, __FUNCTION__);
     if (error) {
         return error;
     }
@@ -1500,23 +1553,23 @@ do_lookup_genl_family(const char *name, struct nlattr **attrs,
     ofpbuf_init(&request, 0);
     nl_msg_put_genlmsghdr(&request, 0, GENL_ID_CTRL, NLM_F_REQUEST,
                           CTRL_CMD_GETFAMILY, 1);
-    nl_msg_put_string(&request, CTRL_ATTR_FAMILY_NAME, name);
-    error = nl_sock_transact(sock, &request, &reply);
+    nl_msg_put_string(&request, CTRL_ATTR_FAMILY_NAME, name, __FUNCTION__);
+    error = nl_sock_transact(sock, &request, &reply, __FUNCTION__);
     ofpbuf_uninit(&request);
     if (error) {
-        nl_sock_destroy(sock);
+        nl_sock_destroy(sock, __FUNCTION__);
         return error;
     }
 
     if (!nl_policy_parse(reply, NLMSG_HDRLEN + GENL_HDRLEN,
                          family_policy, attrs, ARRAY_SIZE(family_policy))
         || nl_attr_get_u16(attrs[CTRL_ATTR_FAMILY_ID]) == 0) {
-        nl_sock_destroy(sock);
+        nl_sock_destroy(sock, __FUNCTION__);
         ofpbuf_delete(reply);
         return EPROTO;
     }
 
-    nl_sock_destroy(sock);
+    nl_sock_destroy(sock, __FUNCTION__);
     *replyp = reply;
     return 0;
 }
@@ -1586,7 +1639,7 @@ do_lookup_genl_family(const char *name, struct nlattr **attrs,
     /* CTRL_ATTR_HDRSIZE and CTRL_ATTR_OPS are not populated, but the
      * callers do not seem to need them. */
     nl_msg_put_u16(reply, CTRL_ATTR_FAMILY_ID, family_id);
-    nl_msg_put_string(reply, CTRL_ATTR_FAMILY_NAME, family_name);
+    nl_msg_put_string(reply, CTRL_ATTR_FAMILY_NAME, family_name, __FUNCTION__);
     nl_msg_put_u32(reply, CTRL_ATTR_VERSION, family_version);
     nl_msg_put_u32(reply, CTRL_ATTR_MAXATTR, family_attrmax);
 
@@ -1623,13 +1676,15 @@ do_lookup_genl_family(const char *name, struct nlattr **attrs,
  */
 int
 nl_lookup_genl_mcgroup(const char *family_name, const char *group_name,
-                       unsigned int *multicast_group)
+                       unsigned int *multicast_group, const char* caller)
 {
     struct nlattr *family_attrs[ARRAY_SIZE(family_policy)];
     const struct nlattr *mc;
     struct ofpbuf *reply;
     unsigned int left;
     int error;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     *multicast_group = 0;
     error = do_lookup_genl_family(family_name, family_attrs, &reply);
@@ -1676,8 +1731,10 @@ exit:
  * may use '*number' as the family number.  On failure, returns a positive
  * errno value and '*number' caches the errno value. */
 int
-nl_lookup_genl_family(const char *name, int *number)
+nl_lookup_genl_family(const char *name, int *number, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     if (*number == 0) {
         struct nlattr *attrs[ARRAY_SIZE(family_policy)];
         struct ofpbuf *reply;
@@ -1706,10 +1763,12 @@ static struct ovs_mutex pool_mutex = OVS_MUTEX_INITIALIZER;
 static struct nl_pool pools[MAX_LINKS] OVS_GUARDED_BY(pool_mutex);
 
 static int
-nl_pool_alloc(int protocol, struct nl_sock **sockp)
+nl_pool_alloc(int protocol, struct nl_sock **sockp, const char* caller)
 {
     struct nl_sock *sock = NULL;
     struct nl_pool *pool;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     ovs_assert(protocol >= 0 && protocol < ARRAY_SIZE(pools));
 
@@ -1724,13 +1783,15 @@ nl_pool_alloc(int protocol, struct nl_sock **sockp)
         *sockp = sock;
         return 0;
     } else {
-        return nl_sock_create(protocol, sockp);
+        return nl_sock_create(protocol, sockp, __FUNCTION__);
     }
 }
 
 static void
-nl_pool_release(struct nl_sock *sock)
+nl_pool_release(struct nl_sock *sock, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     if (sock) {
         struct nl_pool *pool = &pools[sock->protocol];
 
@@ -1741,7 +1802,7 @@ nl_pool_release(struct nl_sock *sock)
         }
         ovs_mutex_unlock(&pool_mutex);
 
-        nl_sock_destroy(sock);
+        nl_sock_destroy(sock, __FUNCTION__);
     }
 }
 
@@ -1788,12 +1849,24 @@ nl_pool_release(struct nl_sock *sock)
  */
 int
 nl_transact(int protocol, const struct ofpbuf *request,
-            struct ofpbuf **replyp)
+            struct ofpbuf **replyp, const char* caller)
 {
     struct nl_sock *sock;
     int error;
+    char *ofb;
 
-    error = nl_pool_alloc(protocol, &sock);
+    VLOG_INFO("%s: protocol: [%d] caller: [%s]...", __FUNCTION__, protocol, (char*)caller);
+
+    ofb = ofpbuf_to_string(request, 16);
+    
+    VLOG_INFO("%s: request: [%s]...", __FUNCTION__, ofb);
+
+    //LogBuffer("request->base", request->base, 4);
+    //LogBuffer("request->data", request->data, request->size);
+    //LogBuffer("request->header", request->header, 16);
+    //LogBuffer("request->msg", request->msg, 16);
+
+    error = nl_pool_alloc(protocol, &sock, __FUNCTION__);
     if (error) {
         if (replyp) {
             *replyp = NULL;
@@ -1801,9 +1874,9 @@ nl_transact(int protocol, const struct ofpbuf *request,
         return error;
     }
 
-    error = nl_sock_transact(sock, request, replyp);
+    error = nl_sock_transact(sock, request, replyp, __FUNCTION__);
 
-    nl_pool_release(sock);
+    nl_pool_release(sock, __FUNCTION__);
     return error;
 }
 
@@ -1829,17 +1902,19 @@ nl_transact(int protocol, const struct ofpbuf *request,
  */
 void
 nl_transact_multiple(int protocol,
-                     struct nl_transaction **transactions, size_t n)
+                     struct nl_transaction **transactions, size_t n, const char* caller)
 {
     struct nl_sock *sock;
     int error;
 
-    error = nl_pool_alloc(protocol, &sock);
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
+    error = nl_pool_alloc(protocol, &sock, __FUNCTION__);
     if (!error) {
-        nl_sock_transact_multiple(sock, transactions, n);
-        nl_pool_release(sock);
+        nl_sock_transact_multiple(sock, transactions, n, __FUNCTION__);
+        nl_pool_release(sock, __FUNCTION__);
     } else {
-        nl_sock_record_errors__(transactions, n, error);
+        nl_sock_record_errors__(transactions, n, error, __FUNCTION__);
     }
 }
 
@@ -1862,7 +1937,7 @@ nl_sock_allocate_seq(struct nl_sock *sock, unsigned int n)
 }
 
 static void
-nlmsghdr_to_string(const struct nlmsghdr *h, int protocol, struct ds *ds)
+nlmsghdr_to_string(const struct nlmsghdr *h, int protocol, struct ds *ds, const char* caller)
 {
     struct nlmsg_flag {
         unsigned int bits;
@@ -1880,6 +1955,8 @@ nlmsghdr_to_string(const struct nlmsghdr *h, int protocol, struct ds *ds)
     };
     const struct nlmsg_flag *flag;
     uint16_t flags_left;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
 
     ds_put_format(ds, "nl(len:%"PRIu32", type=%"PRIu16,
                   h->nlmsg_len, h->nlmsg_type);
@@ -1914,12 +1991,14 @@ nlmsghdr_to_string(const struct nlmsghdr *h, int protocol, struct ds *ds)
 }
 
 static char *
-nlmsg_to_string(const struct ofpbuf *buffer, int protocol)
+nlmsg_to_string(const struct ofpbuf *buffer, int protocol, const char* caller)
 {
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, caller);
+
     struct ds ds = DS_EMPTY_INITIALIZER;
     const struct nlmsghdr *h = ofpbuf_at(buffer, 0, NLMSG_HDRLEN);
     if (h) {
-        nlmsghdr_to_string(h, protocol, &ds);
+        nlmsghdr_to_string(h, protocol, &ds, __FUNCTION__);
         if (h->nlmsg_type == NLMSG_ERROR) {
             const struct nlmsgerr *e;
             e = ofpbuf_at(buffer, NLMSG_HDRLEN,
@@ -1930,7 +2009,7 @@ nlmsg_to_string(const struct ofpbuf *buffer, int protocol)
                     ds_put_format(&ds, "(%s)", ovs_strerror(-e->error));
                 }
                 ds_put_cstr(&ds, ", in-reply-to(");
-                nlmsghdr_to_string(&e->msg, protocol, &ds);
+                nlmsghdr_to_string(&e->msg, protocol, &ds, __FUNCTION__);
                 ds_put_cstr(&ds, "))");
             } else {
                 ds_put_cstr(&ds, " error(truncated)");
@@ -1963,12 +2042,16 @@ static void
 log_nlmsg(const char *function, int error,
           const void *message, size_t size, int protocol)
 {
-    if (!VLOG_IS_DBG_ENABLED()) {
+    //rolaya_check: restore...
+    /*if (!VLOG_IS_DBG_ENABLED()) {
         return;
-    }
+    }*/
 
     struct ofpbuf buffer = ofpbuf_const_initializer(message, size);
-    char *nlmsg = nlmsg_to_string(&buffer, protocol);
+    char *nlmsg = nlmsg_to_string(&buffer, protocol, __FUNCTION__);
+    
+    VLOG_INFO("%s (%s): %s", function, ovs_strerror(error), nlmsg);
+
     VLOG_DBG_RL(&rl, "%s (%s): %s", function, ovs_strerror(error), nlmsg);
     free(nlmsg);
 }

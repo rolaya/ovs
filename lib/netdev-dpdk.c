@@ -4087,7 +4087,7 @@ netdev_dpdk_get_qos(const struct netdev *netdev,
 
 static int
 netdev_dpdk_set_qos(struct netdev *netdev, const char *type,
-                    const struct smap *details)
+                    const struct smap *details, const char* caller)
 {
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
     const struct dpdk_qos_ops *new_ops = NULL;

@@ -206,33 +206,33 @@ struct nl_sock;
 #endif
 
 /* Netlink sockets. */
-int nl_sock_create(int protocol, struct nl_sock **);
-int nl_sock_clone(const struct nl_sock *, struct nl_sock **);
-void nl_sock_destroy(struct nl_sock *);
+int nl_sock_create(int protocol, struct nl_sock **, const char* caller);
+int nl_sock_clone(const struct nl_sock *, struct nl_sock **, const char* caller);
+void nl_sock_destroy(struct nl_sock *, const char* caller);
 
-int nl_sock_join_mcgroup(struct nl_sock *, unsigned int multicast_group);
-int nl_sock_leave_mcgroup(struct nl_sock *, unsigned int multicast_group);
+int nl_sock_join_mcgroup(struct nl_sock *, unsigned int multicast_group, const char* caller);
+int nl_sock_leave_mcgroup(struct nl_sock *, unsigned int multicast_group, const char* caller);
 
-int nl_sock_listen_all_nsid(struct nl_sock *, bool enable);
+int nl_sock_listen_all_nsid(struct nl_sock *, bool enable, const char* caller);
 
 #ifdef _WIN32
 int nl_sock_subscribe_packets(struct nl_sock *sock);
 int nl_sock_unsubscribe_packets(struct nl_sock *sock);
 #endif
 
-int nl_sock_send(struct nl_sock *, const struct ofpbuf *, bool wait);
+int nl_sock_send(struct nl_sock *, const struct ofpbuf *, bool wait, const char* caller);
 int nl_sock_send_seq(struct nl_sock *, const struct ofpbuf *,
-                     uint32_t nlmsg_seq, bool wait);
-int nl_sock_recv(struct nl_sock *, struct ofpbuf *, int *nsid, bool wait);
+                     uint32_t nlmsg_seq, bool wait, const char* caller);
+int nl_sock_recv(struct nl_sock *, struct ofpbuf *, int *nsid, bool wait, const char* caller);
 
-int nl_sock_drain(struct nl_sock *);
+int nl_sock_drain(struct nl_sock *, const char* caller);
 
-void nl_sock_wait(const struct nl_sock *, short int events);
+void nl_sock_wait(const struct nl_sock *, short int events, const char* caller);
 #ifndef _WIN32
-int nl_sock_fd(const struct nl_sock *);
+int nl_sock_fd(const struct nl_sock *, const char* caller);
 #endif
 
-uint32_t nl_sock_pid(const struct nl_sock *);
+uint32_t nl_sock_pid(const struct nl_sock *, const char* caller);
 
 /* Batching transactions. */
 struct nl_transaction {
@@ -252,8 +252,8 @@ struct nl_transaction {
 
 /* Transactions without an allocated socket. */
 int nl_transact(int protocol, const struct ofpbuf *request,
-                struct ofpbuf **replyp);
-void nl_transact_multiple(int protocol, struct nl_transaction **, size_t n);
+                struct ofpbuf **replyp, const char* caller);
+void nl_transact_multiple(int protocol, struct nl_transaction **, size_t n, const char* caller);
 
 /* Table dumping. */
 #define NL_DUMP_BUFSIZE         4096
@@ -271,13 +271,13 @@ struct nl_dump {
 };
 
 void nl_dump_start(struct nl_dump *, int protocol,
-                   const struct ofpbuf *request);
-bool nl_dump_next(struct nl_dump *, struct ofpbuf *reply, struct ofpbuf *buf);
-int nl_dump_done(struct nl_dump *);
+                   const struct ofpbuf *request, const char* caller);
+bool nl_dump_next(struct nl_dump *, struct ofpbuf *reply, struct ofpbuf *buf, const char* caller);
+int nl_dump_done(struct nl_dump *, const char* caller);
 
 /* Miscellaneous */
-int nl_lookup_genl_family(const char *name, int *number);
+int nl_lookup_genl_family(const char *name, int *number, const char* caller);
 int nl_lookup_genl_mcgroup(const char *family_name, const char *group_name,
-                           unsigned int *multicast_group);
+                           unsigned int *multicast_group, const char* caller);
 
 #endif /* netlink-socket.h */

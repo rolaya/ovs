@@ -814,7 +814,7 @@ tun_metadata_to_geneve_nlattr(const struct flow_tnl *tun,
     } else if (flow->metadata.present.len || is_mask) {
         nl_msg_put_unspec(b, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS,
                           tun->metadata.opts.gnv,
-                          flow->metadata.present.len);
+                          flow->metadata.present.len, __FUNCTION__);
     }
 }
 

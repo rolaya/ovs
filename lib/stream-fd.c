@@ -30,6 +30,7 @@
 #include "stream-provider.h"
 #include "stream.h"
 #include "openvswitch/vlog.h"
+#include "debug.h"
 
 VLOG_DEFINE_THIS_MODULE(stream_fd);
 
@@ -127,7 +128,7 @@ fd_send(struct stream *stream, const void *buffer, size_t n)
     ssize_t retval;
     int error;
 
-    retval = send(s->fd, buffer, n, 0);
+    retval = SOCK_SEND(s->fd, buffer, n, 0);
     if (retval < 0) {
         error = sock_errno();
 #ifdef _WIN32

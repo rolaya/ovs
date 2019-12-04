@@ -253,7 +253,7 @@ create_nl_sock(struct dpif_netlink *dpif OVS_UNUSED, struct nl_sock **sockp)
     OVS_REQ_WRLOCK(dpif->upcall_lock)
 {
 #ifndef _WIN32
-    return nl_sock_create(NETLINK_GENERIC, sockp);
+    return nl_sock_create(NETLINK_GENERIC, sockp, __FUNCTION__);
 #else
     /* Pick netlink sockets to use in a round-robin fashion from each
      * handler's pool of sockets. */
@@ -280,7 +280,7 @@ static void
 close_nl_sock(struct nl_sock *sock)
 {
 #ifndef _WIN32
-    nl_sock_destroy(sock);
+    nl_sock_destroy(sock, __FUNCTION__);
 #endif
 }
 
@@ -307,7 +307,7 @@ dpif_netlink_enumerate(struct sset *all_dps,
 
     ofpbuf_use_stub(&buf, reply_stub, sizeof reply_stub);
     dpif_netlink_dp_dump_start(&dump);
-    while (nl_dump_next(&dump, &msg, &buf)) {
+    while (nl_dump_next(&dump, &msg, &buf, __FUNCTION__)) {
         struct dpif_netlink_dp dp;
 
         if (!dpif_netlink_dp_from_ofpbuf(&dp, &msg)) {
@@ -315,7 +315,7 @@ dpif_netlink_enumerate(struct sset *all_dps,
         }
     }
     ofpbuf_uninit(&buf);
-    return nl_dump_done(&dump);
+    return nl_dump_done(&dump, __FUNCTION__);
 }
 
 static int
@@ -443,7 +443,7 @@ vport_get_pid(struct dpif_netlink *dpif, uint32_t port_idx,
     }
     ovs_assert(!WINDOWS || dpif->n_handlers <= 1);
 
-    *upcall_pid = nl_sock_pid(dpif->channels[port_idx].sock);
+    *upcall_pid = nl_sock_pid(dpif->channels[port_idx].sock, __FUNCTION__);
 
     return true;
 }
@@ -499,7 +499,7 @@ vport_add_channel(struct dpif_netlink *dpif, odp_port_t port_no,
         struct dpif_handler *handler = &dpif->handlers[i];
 
 #ifndef _WIN32
-        if (epoll_ctl(handler->epoll_fd, EPOLL_CTL_ADD, nl_sock_fd(sock),
+        if (epoll_ctl(handler->epoll_fd, EPOLL_CTL_ADD, nl_sock_fd(sock, __FUNCTION__),
                       &event) < 0) {
             error = errno;
             goto error;
@@ -515,7 +515,7 @@ error:
 #ifndef _WIN32
     while (i--) {
         epoll_ctl(dpif->handlers[i].epoll_fd, EPOLL_CTL_DEL,
-                  nl_sock_fd(sock), NULL);
+                  nl_sock_fd(sock, __FUNCTION__), NULL);
     }
 #endif
     dpif->channels[port_idx].sock = NULL;
@@ -538,12 +538,12 @@ vport_del_channels(struct dpif_netlink *dpif, odp_port_t port_no)
         struct dpif_handler *handler = &dpif->handlers[i];
 #ifndef _WIN32
         epoll_ctl(handler->epoll_fd, EPOLL_CTL_DEL,
-                  nl_sock_fd(dpif->channels[port_idx].sock), NULL);
+                  nl_sock_fd(dpif->channels[port_idx].sock, __FUNCTION__), NULL);
 #endif
         handler->event_offset = handler->n_events = 0;
     }
 #ifndef _WIN32
-    nl_sock_destroy(dpif->channels[port_idx].sock);
+    nl_sock_destroy(dpif->channels[port_idx].sock, __FUNCTION__);
 #endif
     dpif->channels[port_idx].sock = NULL;
 }
@@ -597,7 +597,7 @@ dpif_netlink_close(struct dpif *dpif_)
 {
     struct dpif_netlink *dpif = dpif_netlink_cast(dpif_);
 
-    nl_sock_destroy(dpif->port_notifier);
+    nl_sock_destroy(dpif->port_notifier, __FUNCTION__);
 
     fat_rwlock_wrlock(&dpif->upcall_lock);
     destroy_all_channels(dpif);
@@ -769,7 +769,7 @@ dpif_netlink_port_add__(struct dpif_netlink *dpif, const char *name,
 
     request.port_no = *port_nop;
     if (sock) {
-        upcall_pids = nl_sock_pid(sock);
+        upcall_pids = nl_sock_pid(sock, __FUNCTION__);
     }
     request.n_upcall_pids = 1;
     request.upcall_pids = &upcall_pids;
@@ -1049,7 +1049,7 @@ dpif_netlink_port_get_pid__(const struct dpif_netlink *dpif,
          * thread deletes the vport while the handler thread is handling
          * the upcall from that port. */
         if (dpif->channels[idx].sock) {
-            pid = nl_sock_pid(dpif->channels[idx].sock);
+            pid = nl_sock_pid(dpif->channels[idx].sock, __FUNCTION__);
         }
     }
 
@@ -1104,7 +1104,7 @@ dpif_netlink_port_dump_start__(const struct dpif_netlink *dpif,
 
     buf = ofpbuf_new(1024);
     dpif_netlink_vport_to_ofpbuf(&request, buf);
-    nl_dump_start(dump, NETLINK_GENERIC, buf);
+    nl_dump_start(dump, NETLINK_GENERIC, buf, __FUNCTION__);
     ofpbuf_delete(buf);
 }
 
@@ -1130,7 +1130,7 @@ dpif_netlink_port_dump_next__(const struct dpif_netlink *dpif,
     struct ofpbuf buf;
     int error;
 
-    if (!nl_dump_next(dump, &buf, buffer)) {
+    if (!nl_dump_next(dump, &buf, buffer, __FUNCTION__)) {
         return EOF;
     }
 
@@ -1166,7 +1166,7 @@ static int
 dpif_netlink_port_dump_done(const struct dpif *dpif_ OVS_UNUSED, void *state_)
 {
     struct dpif_netlink_port_state *state = state_;
-    int error = nl_dump_done(&state->dump);
+    int error = nl_dump_done(&state->dump, __FUNCTION__);
 
     ofpbuf_uninit(&state->buf);
     free(state);
@@ -1183,14 +1183,14 @@ dpif_netlink_port_poll(const struct dpif *dpif_, char **devnamep)
         struct nl_sock *sock;
         int error;
 
-        error = nl_sock_create(NETLINK_GENERIC, &sock);
+        error = nl_sock_create(NETLINK_GENERIC, &sock, __FUNCTION__);
         if (error) {
             return error;
         }
 
-        error = nl_sock_join_mcgroup(sock, ovs_vport_mcgroup);
+        error = nl_sock_join_mcgroup(sock, ovs_vport_mcgroup, __FUNCTION__);
         if (error) {
-            nl_sock_destroy(sock);
+            nl_sock_destroy(sock, __FUNCTION__);
             return error;
         }
         dpif->port_notifier = sock;
@@ -1207,7 +1207,7 @@ dpif_netlink_port_poll(const struct dpif *dpif_, char **devnamep)
         int error;
 
         ofpbuf_use_stub(&buf, buf_stub, sizeof buf_stub);
-        error = nl_sock_recv(dpif->port_notifier, &buf, NULL, false);
+        error = nl_sock_recv(dpif->port_notifier, &buf, NULL, false, __FUNCTION__);
         if (!error) {
             struct dpif_netlink_vport vport;
 
@@ -1230,7 +1230,7 @@ dpif_netlink_port_poll(const struct dpif *dpif_, char **devnamep)
         } else if (error != EAGAIN) {
             VLOG_WARN_RL(&rl, "error reading or parsing netlink (%s)",
                          ovs_strerror(error));
-            nl_sock_drain(dpif->port_notifier);
+            nl_sock_drain(dpif->port_notifier, __FUNCTION__);
             error = ENOBUFS;
         }
 
@@ -1247,7 +1247,7 @@ dpif_netlink_port_poll_wait(const struct dpif *dpif_)
     const struct dpif_netlink *dpif = dpif_netlink_cast(dpif_);
 
     if (dpif->port_notifier) {
-        nl_sock_wait(dpif->port_notifier, POLLIN);
+        nl_sock_wait(dpif->port_notifier, POLLIN, __FUNCTION__);
     } else {
         poll_immediate_wake();
     }
@@ -1437,7 +1437,7 @@ dpif_netlink_flow_dump_create(const struct dpif *dpif_, bool terse,
 
         buf = ofpbuf_new(1024);
         dpif_netlink_flow_to_ofpbuf(&request, buf);
-        nl_dump_start(&dump->nl_dump, NETLINK_GENERIC, buf);
+        nl_dump_start(&dump->nl_dump, NETLINK_GENERIC, buf, __FUNCTION__);
         ofpbuf_delete(buf);
     }
     atomic_init(&dump->status, 0);
@@ -1456,7 +1456,7 @@ dpif_netlink_flow_dump_destroy(struct dpif_flow_dump *dump_)
     int dump_status;
 
     if (dump->types.ovs_flows) {
-        nl_status = nl_dump_done(&dump->nl_dump);
+        nl_status = nl_dump_done(&dump->nl_dump, __FUNCTION__);
     }
 
     for (int i = 0; i < dump->netdev_dumps_num; i++) {
@@ -1702,7 +1702,7 @@ dpif_netlink_flow_dump_next(struct dpif_flow_dump_thread *thread_,
         int error;
 
         /* Try to grab another flow. */
-        if (!nl_dump_next(&dump->nl_dump, &nl_flow, &thread->nl_flows)) {
+        if (!nl_dump_next(&dump->nl_dump, &nl_flow, &thread->nl_flows, __FUNCTION__)) {
             break;
         }
 
@@ -1763,14 +1763,14 @@ dpif_netlink_encode_execute(int dp_ifindex, const struct dpif_execute *d_exec,
 
     nl_msg_put_unspec(buf, OVS_PACKET_ATTR_PACKET,
                       dp_packet_data(d_exec->packet),
-                      dp_packet_size(d_exec->packet));
+                      dp_packet_size(d_exec->packet), __FUNCTION__);
 
     key_ofs = nl_msg_start_nested(buf, OVS_PACKET_ATTR_KEY);
     odp_key_from_dp_packet(buf, d_exec->packet);
     nl_msg_end_nested(buf, key_ofs);
 
     nl_msg_put_unspec(buf, OVS_PACKET_ATTR_ACTIONS,
-                      d_exec->actions, d_exec->actions_len);
+                      d_exec->actions, d_exec->actions_len, __FUNCTION__);
     if (d_exec->probe) {
         nl_msg_put_flag(buf, OVS_PACKET_ATTR_PROBE);
     }
@@ -1872,7 +1872,7 @@ dpif_netlink_operate__(struct dpif_netlink *dpif,
     for (i = 0; i < n_ops; i++) {
         txnsp[i] = &auxes[i].txn;
     }
-    nl_transact_multiple(NETLINK_GENERIC, txnsp, n_ops);
+    nl_transact_multiple(NETLINK_GENERIC, txnsp, n_ops, __FUNCTION__);
 
     for (i = 0; i < n_ops; i++) {
         struct op_auxdata *aux = &auxes[i];
@@ -2327,11 +2327,11 @@ dpif_netlink_refresh_channels(struct dpif_netlink *dpif, uint32_t n_handlers)
             if (error) {
                 VLOG_INFO("%s: could not add channels for port %s",
                           dpif_name(&dpif->dpif), vport.name);
-                nl_sock_destroy(sock);
+                nl_sock_destroy(sock, __FUNCTION__);
                 retval = error;
                 goto error;
             }
-            upcall_pid = nl_sock_pid(sock);
+            upcall_pid = nl_sock_pid(sock, __FUNCTION__);
         }
 
         /* Configure the vport to deliver misses to 'sock'. */
@@ -2371,7 +2371,7 @@ dpif_netlink_refresh_channels(struct dpif_netlink *dpif, uint32_t n_handlers)
     error:
         vport_del_channels(dpif, vport.port_no);
     }
-    nl_dump_done(&dump);
+    nl_dump_done(&dump, __FUNCTION__);
     ofpbuf_uninit(&buf);
 
     /* Discard any saved channels that we didn't reuse. */
@@ -2639,7 +2639,7 @@ dpif_netlink_recv__(struct dpif_netlink *dpif, uint32_t handler_id,
                 return EAGAIN;
             }
 
-            error = nl_sock_recv(ch->sock, buf, NULL, false);
+            error = nl_sock_recv(ch->sock, buf, NULL, false, __FUNCTION__);
             if (error == ENOBUFS) {
                 /* ENOBUFS typically means that we've received so many
                  * packets that the buffer overflowed.  Try again
@@ -2736,7 +2736,7 @@ dpif_netlink_recv_purge__(struct dpif_netlink *dpif)
         }
         for (i = 0; i < dpif->uc_array_size; i++ ) {
 
-            nl_sock_drain(dpif->channels[i].sock);
+            nl_sock_drain(dpif->channels[i].sock, __FUNCTION__);
         }
     }
 }
@@ -2883,7 +2883,7 @@ dpif_netlink_ct_set_limits(struct dpif *dpif OVS_UNUSED,
     }
     nl_msg_end_nested(request, opt_offset);
 
-    int err = nl_transact(NETLINK_GENERIC, request, NULL);
+    int err = nl_transact(NETLINK_GENERIC, request, NULL, __FUNCTION__);
     ofpbuf_delete(request);
     return err;
 }
@@ -2975,7 +2975,7 @@ dpif_netlink_ct_get_limits(struct dpif *dpif OVS_UNUSED,
     }
 
     struct ofpbuf *reply;
-    int err = nl_transact(NETLINK_GENERIC, request, &reply);
+    int err = nl_transact(NETLINK_GENERIC, request, &reply, __FUNCTION__);
     if (err) {
         goto out;
     }
@@ -3019,7 +3019,7 @@ dpif_netlink_ct_del_limits(struct dpif *dpif OVS_UNUSED,
         nl_msg_end_nested(request, opt_offset);
     }
 
-    int err = nl_transact(NETLINK_GENERIC, request, NULL);
+    int err = nl_transact(NETLINK_GENERIC, request, NULL, __FUNCTION__);
 
     ofpbuf_delete(request);
     return err;
@@ -3551,7 +3551,7 @@ dpif_netlink_meter_transact(struct ofpbuf *request, struct ofpbuf **replyp,
                             const struct nl_policy *reply_policy,
                             struct nlattr **a, size_t size_a)
 {
-    int error = nl_transact(NETLINK_GENERIC, request, replyp);
+    int error = nl_transact(NETLINK_GENERIC, request, replyp, __FUNCTION__);
     ofpbuf_uninit(request);
 
     if (error) {
@@ -3949,33 +3949,33 @@ dpif_netlink_init(void)
 
     if (ovsthread_once_start(&once)) {
         error = nl_lookup_genl_family(OVS_DATAPATH_FAMILY,
-                                      &ovs_datapath_family);
+                                      &ovs_datapath_family, __FUNCTION__);
         if (error) {
             VLOG_INFO("Generic Netlink family '%s' does not exist. "
                       "The Open vSwitch kernel module is probably not loaded.",
                       OVS_DATAPATH_FAMILY);
         }
         if (!error) {
-            error = nl_lookup_genl_family(OVS_VPORT_FAMILY, &ovs_vport_family);
+            error = nl_lookup_genl_family(OVS_VPORT_FAMILY, &ovs_vport_family, __FUNCTION__);
         }
         if (!error) {
-            error = nl_lookup_genl_family(OVS_FLOW_FAMILY, &ovs_flow_family);
+            error = nl_lookup_genl_family(OVS_FLOW_FAMILY, &ovs_flow_family, __FUNCTION__);
         }
         if (!error) {
             error = nl_lookup_genl_family(OVS_PACKET_FAMILY,
-                                          &ovs_packet_family);
+                                          &ovs_packet_family, __FUNCTION__);
         }
         if (!error) {
             error = nl_lookup_genl_mcgroup(OVS_VPORT_FAMILY, OVS_VPORT_MCGROUP,
-                                           &ovs_vport_mcgroup);
+                                           &ovs_vport_mcgroup, __FUNCTION__);
         }
         if (!error) {
-            if (nl_lookup_genl_family(OVS_METER_FAMILY, &ovs_meter_family)) {
+            if (nl_lookup_genl_family(OVS_METER_FAMILY, &ovs_meter_family, __FUNCTION__)) {
                 VLOG_INFO("The kernel module does not support meters.");
             }
         }
         if (nl_lookup_genl_family(OVS_CT_LIMIT_FAMILY,
-                                  &ovs_ct_limit_family) < 0) {
+                                  &ovs_ct_limit_family, __FUNCTION__) < 0) {
             VLOG_INFO("Generic Netlink family '%s' does not exist. "
                       "Please update the Open vSwitch kernel module to enable "
                       "the conntrack limit feature.", OVS_CT_LIMIT_FAMILY);
@@ -4093,18 +4093,18 @@ dpif_netlink_vport_to_ofpbuf(const struct dpif_netlink_vport *vport,
     }
 
     if (vport->name) {
-        nl_msg_put_string(buf, OVS_VPORT_ATTR_NAME, vport->name);
+        nl_msg_put_string(buf, OVS_VPORT_ATTR_NAME, vport->name, __FUNCTION__);
     }
 
     if (vport->upcall_pids) {
         nl_msg_put_unspec(buf, OVS_VPORT_ATTR_UPCALL_PID,
                           vport->upcall_pids,
-                          vport->n_upcall_pids * sizeof *vport->upcall_pids);
+                          vport->n_upcall_pids * sizeof *vport->upcall_pids, __FUNCTION__);
     }
 
     if (vport->stats) {
         nl_msg_put_unspec(buf, OVS_VPORT_ATTR_STATS,
-                          vport->stats, sizeof *vport->stats);
+                          vport->stats, sizeof *vport->stats, __FUNCTION__);
     }
 
     if (vport->options) {
@@ -4148,7 +4148,7 @@ dpif_netlink_vport_transact(const struct dpif_netlink_vport *request,
 
     request_buf = ofpbuf_new(1024);
     dpif_netlink_vport_to_ofpbuf(request, request_buf);
-    error = nl_transact(NETLINK_GENERIC, request_buf, bufp);
+    error = nl_transact(NETLINK_GENERIC, request_buf, bufp, __FUNCTION__);
     ofpbuf_delete(request_buf);
 
     if (reply) {
@@ -4241,7 +4241,7 @@ dpif_netlink_dp_to_ofpbuf(const struct dpif_netlink_dp *dp, struct ofpbuf *buf)
     ovs_header->dp_ifindex = dp->dp_ifindex;
 
     if (dp->name) {
-        nl_msg_put_string(buf, OVS_DP_ATTR_NAME, dp->name);
+        nl_msg_put_string(buf, OVS_DP_ATTR_NAME, dp->name, __FUNCTION__);
     }
 
     if (dp->upcall_pid) {
@@ -4273,7 +4273,7 @@ dpif_netlink_dp_dump_start(struct nl_dump *dump)
 
     buf = ofpbuf_new(1024);
     dpif_netlink_dp_to_ofpbuf(&request, buf);
-    nl_dump_start(dump, NETLINK_GENERIC, buf);
+    nl_dump_start(dump, NETLINK_GENERIC, buf, __FUNCTION__);
     ofpbuf_delete(buf);
 }
 
@@ -4294,7 +4294,7 @@ dpif_netlink_dp_transact(const struct dpif_netlink_dp *request,
 
     request_buf = ofpbuf_new(1024);
     dpif_netlink_dp_to_ofpbuf(request, request_buf);
-    error = nl_transact(NETLINK_GENERIC, request_buf, bufp);
+    error = nl_transact(NETLINK_GENERIC, request_buf, bufp, __FUNCTION__);
     ofpbuf_delete(request_buf);
 
     if (reply) {
@@ -4443,7 +4443,7 @@ put_exclude_packet_type(struct ofpbuf *buf, uint16_t type,
         }
         nl_msg_end_nested(buf, ofs);
     } else {
-        nl_msg_put_unspec(buf, type, data, data_len);
+        nl_msg_put_unspec(buf, type, data, data_len, __FUNCTION__);
     }
 }
 
@@ -4481,7 +4481,7 @@ dpif_netlink_flow_to_ofpbuf(const struct dpif_netlink_flow *flow,
         }
         if (flow->actions || flow->actions_len) {
             nl_msg_put_unspec(buf, OVS_FLOW_ATTR_ACTIONS,
-                              flow->actions, flow->actions_len);
+                              flow->actions, flow->actions_len, __FUNCTION__);
         }
     }
 
@@ -4527,7 +4527,7 @@ dpif_netlink_flow_transact(struct dpif_netlink_flow *request,
 
     request_buf = ofpbuf_new(1024);
     dpif_netlink_flow_to_ofpbuf(request, request_buf);
-    error = nl_transact(NETLINK_GENERIC, request_buf, bufp);
+    error = nl_transact(NETLINK_GENERIC, request_buf, bufp, __FUNCTION__);
     ofpbuf_delete(request_buf);
 
     if (reply) {

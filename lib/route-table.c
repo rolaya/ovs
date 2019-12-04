@@ -173,11 +173,11 @@ route_table_reset(void)
     rtgenmsg = ofpbuf_put_zeros(&request, sizeof *rtgenmsg);
     rtgenmsg->rtgen_family = AF_UNSPEC;
 
-    nl_dump_start(&dump, NETLINK_ROUTE, &request);
+    nl_dump_start(&dump, NETLINK_ROUTE, &request, __FUNCTION__);
     ofpbuf_uninit(&request);
 
     ofpbuf_use_stub(&buf, reply_stub, sizeof reply_stub);
-    while (nl_dump_next(&dump, &reply, &buf)) {
+    while (nl_dump_next(&dump, &reply, &buf, __FUNCTION__)) {
         struct route_table_msg msg;
 
         if (route_table_parse(&reply, &msg)) {
@@ -186,7 +186,7 @@ route_table_reset(void)
     }
     ofpbuf_uninit(&buf);
 
-    return nl_dump_done(&dump);
+    return nl_dump_done(&dump, __FUNCTION__);
 }
 
 /* Return RTNLGRP_IPV4_ROUTE or RTNLGRP_IPV6_ROUTE on success, 0 on parse

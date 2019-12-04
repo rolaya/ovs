@@ -49,20 +49,20 @@ main(int argc OVS_UNUSED, char *argv[])
     set_program_name(argv[0]);
     vlog_set_levels(NULL, VLF_ANY_DESTINATION, VLL_DBG);
 
-    error = nl_sock_create(NETLINK_ROUTE, &sock);
+    error = nl_sock_create(NETLINK_ROUTE, &sock, __FUNCTION__);
     if (error) {
         ovs_fatal(error, "could not create rtnetlink socket");
     }
 
-    error = nl_sock_join_mcgroup(sock, RTNLGRP_LINK);
+    error = nl_sock_join_mcgroup(sock, RTNLGRP_LINK, __FUNCTION__);
     if (error) {
         ovs_fatal(error, "could not join RTNLGRP_LINK multicast group");
     }
 
-    nl_sock_listen_all_nsid(sock, true);
+    nl_sock_listen_all_nsid(sock, true, __FUNCTION__);
     ofpbuf_use_stub(&buf, buf_stub, sizeof buf_stub);
     for (;;) {
-        error = nl_sock_recv(sock, &buf, &nsid, false);
+        error = nl_sock_recv(sock, &buf, &nsid, false, __FUNCTION__);
         if (error == EAGAIN) {
             /* Nothing to do. */
         } else if (error == ENOBUFS) {
@@ -141,7 +141,7 @@ main(int argc OVS_UNUSED, char *argv[])
             }
         }
 
-        nl_sock_wait(sock, POLLIN);
+        nl_sock_wait(sock, POLLIN, __FUNCTION__);
         poll_block();
     }
 }

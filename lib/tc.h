@@ -79,8 +79,8 @@ tc_get_minor(unsigned int handle)
 }
 
 struct tcmsg *tc_make_request(int ifindex, int type,
-                              unsigned int flags, struct ofpbuf *);
-int tc_transact(struct ofpbuf *request, struct ofpbuf **replyp);
+                              unsigned int flags, struct ofpbuf *, const char* caller);
+int tc_transact(struct ofpbuf *request, struct ofpbuf **replyp, const char* caller);
 int tc_add_del_qdisc(int ifindex, bool add, uint32_t block_id,
                      enum tc_qdisc_hook hook);
 

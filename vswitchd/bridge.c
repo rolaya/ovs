@@ -259,7 +259,7 @@ static uint64_t last_ifaces_changed;
 #define BRIDGE_CONTROLLER_PACKET_QUEUE_MAX_SIZE 512
 
 static void add_del_bridges(const struct ovsrec_open_vswitch *);
-static void bridge_run__(void);
+static void bridge_run__(const char* caller);
 static void bridge_create(const struct ovsrec_bridge *);
 static void bridge_destroy(struct bridge *, bool del);
 static struct bridge *bridge_lookup(const char *name);
@@ -343,7 +343,7 @@ static struct iface *iface_from_ofp_port(const struct bridge *,
 static void iface_set_mac(const struct bridge *, const struct port *, struct iface *);
 static void iface_set_ofport(const struct ovsrec_interface *, ofp_port_t ofport);
 static void iface_clear_db_record(const struct ovsrec_interface *if_cfg, char *errp);
-static void iface_configure_qos(struct iface *, const struct ovsrec_qos *);
+static void iface_configure_qos(struct iface *, const struct ovsrec_qos *, const char* caller);
 static void iface_configure_cfm(struct iface *);
 static void iface_refresh_cfm_stats(struct iface *);
 static void iface_refresh_stats(struct iface *);
@@ -785,12 +785,14 @@ datapath_reconfigure(const struct ovsrec_open_vswitch *cfg)
 }
 
 static void
-bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
+bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg, const char* caller)
 {
     struct sockaddr_in *managers;
     struct bridge *br, *next;
     int sflow_bridge_number;
     size_t n_managers;
+
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
 
     COVERAGE_INC(bridge_reconfigure);
 
@@ -894,7 +896,7 @@ bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
                 /* Clear eventual previous errors */
                 ovsrec_interface_set_error(iface->cfg, NULL);
                 iface_configure_cfm(iface);
-                iface_configure_qos(iface, port->cfg->qos);
+                iface_configure_qos(iface, port->cfg->qos, __FUNCTION__);
                 iface_set_mac(br, port, iface);
                 ofproto_port_set_bfd(br->ofproto, iface->ofp_port,
                                      &iface->cfg->bfd);
@@ -924,7 +926,7 @@ bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
      * client that reconfiguration is complete, otherwise there is a very
      * narrow race window in which e.g. ofproto/trace will not recognize the
      * new configuration (sometimes this causes unit test failures). */
-    bridge_run__();
+    bridge_run__(__FUNCTION__);
 }
 
 /* Delete ofprotos which aren't configured or have the wrong type.  Create
@@ -3175,11 +3177,13 @@ status_update_wait(void)
 }
 
 static void
-bridge_run__(void)
+bridge_run__(const char* caller)
 {
     struct bridge *br;
     struct sset types;
     const char *type;
+
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
 
     /* Let each datapath type do the work that it needs to do. */
     sset_init(&types);
@@ -3196,10 +3200,12 @@ bridge_run__(void)
 }
 
 void
-bridge_run(void)
+bridge_run(const char* caller)
 {
     static struct ovsrec_open_vswitch null_cfg;
     const struct ovsrec_open_vswitch *cfg;
+
+VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
 
     ovsrec_open_vswitch_init(&null_cfg);
 
@@ -3249,7 +3255,7 @@ bridge_run(void)
                                         "flow-restore-wait", false));
     }
 
-    bridge_run__();
+    bridge_run__(__FUNCTION__);
 
     /* Re-configure SSL.  We do this on every trip through the main loop,
      * instead of just when the database changes, because the contents of the
@@ -3270,7 +3276,7 @@ bridge_run(void)
 
         idl_seqno = ovsdb_idl_get_seqno(idl);
         txn = ovsdb_idl_txn_create(idl);
-        bridge_reconfigure(cfg ? cfg : &null_cfg);
+        bridge_reconfigure(cfg ? cfg : &null_cfg, __FUNCTION__);
 
         if (cfg) {
             ovsrec_open_vswitch_set_cur_cfg(cfg, cfg->next_cfg);
@@ -4748,14 +4754,16 @@ queue_ids_include(const struct ovsdb_datum *queues, int64_t target)
 }
 
 static void
-iface_configure_qos(struct iface *iface, const struct ovsrec_qos *qos)
+iface_configure_qos(struct iface *iface, const struct ovsrec_qos *qos, const char* caller)
 {
     struct ofpbuf queues_buf;
+
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
 
     ofpbuf_init(&queues_buf, 0);
 
     if (!qos || qos->type[0] == '\0') {
-        netdev_set_qos(iface->netdev, NULL, NULL);
+        netdev_set_qos(iface->netdev, NULL, NULL, __FUNCTION__);
     } else {
         const struct ovsdb_datum *queues;
         struct netdev_queue_dump dump;
@@ -4765,7 +4773,7 @@ iface_configure_qos(struct iface *iface, const struct ovsrec_qos *qos)
         size_t i;
 
         /* Configure top-level Qos for 'iface'. */
-        netdev_set_qos(iface->netdev, qos->type, &qos->other_config);
+        netdev_set_qos(iface->netdev, qos->type, &qos->other_config, __FUNCTION__);
 
         /* Deconfigure queues that were deleted. */
         queues = ovsrec_qos_get_queues(qos, OVSDB_TYPE_INTEGER,

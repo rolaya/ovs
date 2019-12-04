@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include "byte-order.h"
+#include "debug.h"
 #include "netlink-socket.h"
 #include "netlink.h"
 #include "openvswitch/ofpbuf.h"
@@ -179,9 +180,11 @@ csum_update_flag(struct tc_flower *flower,
 
 struct tcmsg *
 tc_make_request(int ifindex, int type, unsigned int flags,
-                struct ofpbuf *request)
+                struct ofpbuf *request, const char* caller)
 {
     struct tcmsg *tcmsg;
+
+    VLOG_INFO("%s: caller: [%s] type: [%s] [%d]...", __FUNCTION__, (char*)caller, rtm_to_string(type), type);
 
     ofpbuf_init(request, 512);
     nl_msg_put_nlmsghdr(request, sizeof *tcmsg, type, NLM_F_REQUEST | flags);
@@ -195,9 +198,11 @@ tc_make_request(int ifindex, int type, unsigned int flags,
 }
 
 int
-tc_transact(struct ofpbuf *request, struct ofpbuf **replyp)
+tc_transact(struct ofpbuf *request, struct ofpbuf **replyp, const char* caller)
 {
-    int error = nl_transact(NETLINK_ROUTE, request, replyp);
+    VLOG_INFO("%s: caller: [%s]...", __FUNCTION__, (char*)caller);
+
+    int error = nl_transact(NETLINK_ROUTE, request, replyp, __FUNCTION__);
     ofpbuf_uninit(request);
     return error;
 }
@@ -238,24 +243,26 @@ tc_add_del_qdisc(int ifindex, bool add, uint32_t block_id,
     int type = add ? RTM_NEWQDISC : RTM_DELQDISC;
     int flags = add ? NLM_F_EXCL | NLM_F_CREATE : 0;
 
-    tcmsg = tc_make_request(ifindex, type, flags, &request);
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
+    tcmsg = tc_make_request(ifindex, type, flags, &request, __FUNCTION__);
 
     if (hook == TC_EGRESS) {
         tcmsg->tcm_handle = TC_H_MAKE(TC_H_CLSACT, 0);
         tcmsg->tcm_parent = TC_H_CLSACT;
-        nl_msg_put_string(&request, TCA_KIND, "clsact");
+        nl_msg_put_string(&request, TCA_KIND, "clsact", __FUNCTION__);
     } else {
         tcmsg->tcm_handle = TC_H_MAKE(TC_H_INGRESS, 0);
         tcmsg->tcm_parent = TC_H_INGRESS;
-        nl_msg_put_string(&request, TCA_KIND, "ingress");
+        nl_msg_put_string(&request, TCA_KIND, "ingress", __FUNCTION__);
     }
 
-    nl_msg_put_unspec(&request, TCA_OPTIONS, NULL, 0);
+    nl_msg_put_unspec(&request, TCA_OPTIONS, NULL, 0, __FUNCTION__);
     if (hook == TC_INGRESS && block_id) {
         nl_msg_put_u32(&request, TCA_INGRESS_BLOCK, block_id);
     }
 
-    error = tc_transact(&request, NULL);
+    error = tc_transact(&request, NULL, __FUNCTION__);
     if (error) {
         /* If we're deleting the qdisc, don't worry about some of the
          * error conditions. */
@@ -407,6 +414,8 @@ nl_parse_flower_mpls(struct nlattr **attrs, struct tc_flower *flower)
     uint8_t ttl, tc, bos;
     uint32_t label;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!eth_type_mpls(flower->key.eth_type)) {
         return;
     }
@@ -445,6 +454,8 @@ static void
 nl_parse_flower_vlan(struct nlattr **attrs, struct tc_flower *flower)
 {
     ovs_be16 encap_ethtype;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (!eth_type_vlan(flower->key.eth_type)) {
         return;
@@ -499,6 +510,8 @@ nl_parse_geneve_key(const struct nlattr *in_nlattr,
     struct ofpbuf buf;
     size_t left;
     int cnt;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     nl_attr_get_nested(in_nlattr, &buf);
     msg = &buf;
@@ -562,6 +575,8 @@ nl_parse_flower_tunnel_opts(struct nlattr *options,
     struct ofpbuf buf;
     size_t left;
     int err;
+    
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     nl_attr_get_nested(options, &buf);
     msg = &buf;
@@ -589,6 +604,8 @@ flower_tun_geneve_opt_check_len(struct tun_metadata *key,
     const struct geneve_opt *opt, *opt_mask;
     int len, cnt = 0;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     len = key->present.len;
     while (len) {
         opt = &key->opts.gnv[cnt];
@@ -611,6 +628,8 @@ static int
 nl_parse_flower_tunnel(struct nlattr **attrs, struct tc_flower *flower)
 {
     int err;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (attrs[TCA_FLOWER_KEY_ENC_KEY_ID]) {
         ovs_be32 id = nl_attr_get_be32(attrs[TCA_FLOWER_KEY_ENC_KEY_ID]);
@@ -686,6 +705,8 @@ nl_parse_flower_ip(struct nlattr **attrs, struct tc_flower *flower) {
     uint8_t ip_proto = 0;
     struct tc_flower_key *key = &flower->key;
     struct tc_flower_key *mask = &flower->mask;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (attrs[TCA_FLOWER_KEY_IP_PROTO]) {
         ip_proto = nl_attr_get_u8(attrs[TCA_FLOWER_KEY_IP_PROTO]);
@@ -824,6 +845,8 @@ nl_parse_act_pedit(struct nlattr *options, struct tc_flower *flower)
     size_t keys_ex_size, left;
     int type, i = 0, err;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!nl_parse_nested(options, pedit_policy, pe_attrs,
                          ARRAY_SIZE(pedit_policy))) {
         VLOG_ERR_RL(&error_rl, "failed to parse pedit action options");
@@ -935,6 +958,8 @@ nl_parse_act_geneve_opts(const struct nlattr *in_nlattr,
     size_t left;
     int cnt;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     nl_attr_get_nested(in_nlattr, &buf);
     msg = &buf;
 
@@ -1001,6 +1026,8 @@ nl_parse_act_tunnel_opts(struct nlattr *options, struct tc_action *action)
     size_t left;
     int err;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!options) {
         return 0;
     }
@@ -1032,6 +1059,8 @@ nl_parse_act_tunnel_key(struct nlattr *options, struct tc_flower *flower)
     const struct tc_tunnel_key *tun;
     struct tc_action *action;
     int err;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (!nl_parse_nested(options, tunnel_key_policy, tun_attrs,
                 ARRAY_SIZE(tunnel_key_policy))) {
@@ -1121,6 +1150,8 @@ nl_parse_act_drop(struct nlattr *options, struct tc_flower *flower)
     struct nlattr *gact_parms;
     const struct tcf_t *tm;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!nl_parse_nested(options, gact_policy, gact_attrs,
                          ARRAY_SIZE(gact_policy))) {
         VLOG_ERR_RL(&error_rl, "failed to parse gact action options");
@@ -1160,6 +1191,8 @@ nl_parse_act_mirred(struct nlattr *options, struct tc_flower *flower)
     const struct tcf_t *tm;
     struct nlattr *mirred_tm;
     struct tc_action *action;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (!nl_parse_nested(options, mirred_policy, mirred_attrs,
                          ARRAY_SIZE(mirred_policy))) {
@@ -1209,6 +1242,8 @@ nl_parse_act_vlan(struct nlattr *options, struct tc_flower *flower)
     const struct tc_vlan *v;
     const struct nlattr *vlan_parms;
     struct tc_action *action;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (!nl_parse_nested(options, vlan_policy, vlan_attrs,
                          ARRAY_SIZE(vlan_policy))) {
@@ -1261,6 +1296,8 @@ nl_parse_act_mpls(struct nlattr *options, struct tc_flower *flower)
     struct nlattr *mpls_ttl;
     struct nlattr *mpls_bos;
     struct nlattr *mpls_tc;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (!nl_parse_nested(options, mpls_policy, mpls_attrs,
                          ARRAY_SIZE(mpls_policy))) {
@@ -1397,6 +1434,8 @@ nl_parse_single_action(struct nlattr *action, struct tc_flower *flower)
     const struct gnet_stats_basic *bs;
     int err = 0;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!nl_parse_nested(action, act_policy, action_attrs,
                          ARRAY_SIZE(act_policy))) {
         VLOG_ERR_RL(&error_rl, "failed to parse single action options");
@@ -1462,6 +1501,8 @@ nl_parse_flower_actions(struct nlattr **attrs, struct tc_flower *flower)
     struct nlattr *actions_orders[ARRAY_SIZE(actions_orders_policy)];
     const int max_size = ARRAY_SIZE(actions_orders_policy);
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     for (int i = TCA_ACT_MIN_PRIO; i < max_size; i++) {
         actions_orders_policy[i].type = NL_A_NESTED;
         actions_orders_policy[i].optional = true;
@@ -1505,6 +1546,8 @@ nl_parse_flower_options(struct nlattr *nl_options, struct tc_flower *flower)
     struct nlattr *attrs[ARRAY_SIZE(tca_flower_policy)];
     int err;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!nl_parse_nested(nl_options, tca_flower_policy,
                          attrs, ARRAY_SIZE(tca_flower_policy))) {
         VLOG_ERR_RL(&error_rl, "failed to parse flower classifier options");
@@ -1530,6 +1573,8 @@ parse_netlink_to_tc_flower(struct ofpbuf *reply, struct tc_flower *flower)
     struct tcmsg *tc;
     struct nlattr *ta[ARRAY_SIZE(tca_policy)];
     const char *kind;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     if (NLMSG_HDRLEN + sizeof *tc > reply->size) {
         return EPROTO;
@@ -1574,14 +1619,16 @@ tc_dump_flower_start(int ifindex, struct nl_dump *dump, uint32_t block_id,
     struct tcmsg *tcmsg;
     int index;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     index = block_id ? TCM_IFINDEX_MAGIC_BLOCK : ifindex;
-    tcmsg = tc_make_request(index, RTM_GETTFILTER, NLM_F_DUMP, &request);
+    tcmsg = tc_make_request(index, RTM_GETTFILTER, NLM_F_DUMP, &request, __FUNCTION__);
     tcmsg->tcm_parent = (hook == TC_EGRESS) ?
                         TC_EGRESS_PARENT : (block_id ? : TC_INGRESS_PARENT);
     tcmsg->tcm_info = TC_H_UNSPEC;
     tcmsg->tcm_handle = 0;
 
-    nl_dump_start(dump, NETLINK_ROUTE, &request);
+    nl_dump_start(dump, NETLINK_ROUTE, &request, __FUNCTION__);
     ofpbuf_uninit(&request);
 
     return 0;
@@ -1594,13 +1641,15 @@ tc_flush(int ifindex, uint32_t block_id, enum tc_qdisc_hook hook)
     struct tcmsg *tcmsg;
     int index;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     index = block_id ? TCM_IFINDEX_MAGIC_BLOCK : ifindex;
-    tcmsg = tc_make_request(index, RTM_DELTFILTER, NLM_F_ACK, &request);
+    tcmsg = tc_make_request(index, RTM_DELTFILTER, NLM_F_ACK, &request, __FUNCTION__);
     tcmsg->tcm_parent = (hook == TC_EGRESS) ?
                         TC_EGRESS_PARENT : (block_id ? : TC_INGRESS_PARENT);
     tcmsg->tcm_info = TC_H_UNSPEC;
 
-    return tc_transact(&request, NULL);
+    return tc_transact(&request, NULL, __FUNCTION__);
 }
 
 int
@@ -1613,14 +1662,16 @@ tc_del_filter(int ifindex, int prio, int handle, uint32_t block_id,
     int error;
     int index;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     index = block_id ? TCM_IFINDEX_MAGIC_BLOCK : ifindex;
-    tcmsg = tc_make_request(index, RTM_DELTFILTER, NLM_F_ECHO, &request);
+    tcmsg = tc_make_request(index, RTM_DELTFILTER, NLM_F_ECHO, &request, __FUNCTION__);
     tcmsg->tcm_parent = (hook == TC_EGRESS) ?
                         TC_EGRESS_PARENT : (block_id ? : TC_INGRESS_PARENT);
     tcmsg->tcm_info = tc_make_handle(prio, 0);
     tcmsg->tcm_handle = handle;
 
-    error = tc_transact(&request, &reply);
+    error = tc_transact(&request, &reply, __FUNCTION__);
     if (!error) {
         ofpbuf_delete(reply);
     }
@@ -1637,14 +1688,16 @@ tc_get_flower(int ifindex, int prio, int handle, struct tc_flower *flower,
     int error;
     int index;
 
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     index = block_id ? TCM_IFINDEX_MAGIC_BLOCK : ifindex;
-    tcmsg = tc_make_request(index, RTM_GETTFILTER, NLM_F_ECHO, &request);
+    tcmsg = tc_make_request(index, RTM_GETTFILTER, NLM_F_ECHO, &request, __FUNCTION__);
     tcmsg->tcm_parent = (hook == TC_EGRESS) ?
                         TC_EGRESS_PARENT : (block_id ? : TC_INGRESS_PARENT);
     tcmsg->tcm_info = tc_make_handle(prio, 0);
     tcmsg->tcm_handle = handle;
 
-    error = tc_transact(&request, &reply);
+    error = tc_transact(&request, &reply, __FUNCTION__);
     if (error) {
         return error;
     }
@@ -1671,13 +1724,13 @@ nl_msg_put_act_csum(struct ofpbuf *request, uint32_t flags)
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "csum");
+    nl_msg_put_string(request, TCA_ACT_KIND, "csum", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_csum parm = { .action = TC_ACT_PIPE,
                                 .update_flags = flags };
 
-        nl_msg_put_unspec(request, TCA_CSUM_PARMS, &parm, sizeof parm);
+        nl_msg_put_unspec(request, TCA_CSUM_PARMS, &parm, sizeof parm, __FUNCTION__);
     }
     nl_msg_end_nested(request, offset);
 }
@@ -1690,12 +1743,12 @@ nl_msg_put_act_pedit(struct ofpbuf *request, struct tc_pedit *parm,
     size_t offset, offset_keys_ex, offset_key;
     int i;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "pedit");
+    nl_msg_put_string(request, TCA_ACT_KIND, "pedit", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         parm->action = TC_ACT_PIPE;
 
-        nl_msg_put_unspec(request, TCA_PEDIT_PARMS_EX, parm, ksize);
+        nl_msg_put_unspec(request, TCA_PEDIT_PARMS_EX, parm, ksize, __FUNCTION__);
         offset_keys_ex = nl_msg_start_nested(request, TCA_PEDIT_KEYS_EX);
         for (i = 0; i < parm->nkeys; i++, ex++) {
             offset_key = nl_msg_start_nested(request, TCA_PEDIT_KEY_EX);
@@ -1714,13 +1767,13 @@ nl_msg_put_act_push_vlan(struct ofpbuf *request, ovs_be16 tpid,
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "vlan");
+    nl_msg_put_string(request, TCA_ACT_KIND, "vlan", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_vlan parm = { .action = TC_ACT_PIPE,
                                 .v_action = TCA_VLAN_ACT_PUSH };
 
-        nl_msg_put_unspec(request, TCA_VLAN_PARMS, &parm, sizeof parm);
+        nl_msg_put_unspec(request, TCA_VLAN_PARMS, &parm, sizeof parm, __FUNCTION__);
         nl_msg_put_be16(request, TCA_VLAN_PUSH_VLAN_PROTOCOL, tpid);
         nl_msg_put_u16(request, TCA_VLAN_PUSH_VLAN_ID, vid);
         nl_msg_put_u8(request, TCA_VLAN_PUSH_VLAN_PRIORITY, prio);
@@ -1733,13 +1786,15 @@ nl_msg_put_act_pop_vlan(struct ofpbuf *request)
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "vlan");
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
+    nl_msg_put_string(request, TCA_ACT_KIND, "vlan", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_vlan parm = { .action = TC_ACT_PIPE,
                                 .v_action = TCA_VLAN_ACT_POP };
 
-        nl_msg_put_unspec(request, TCA_VLAN_PARMS, &parm, sizeof parm);
+        nl_msg_put_unspec(request, TCA_VLAN_PARMS, &parm, sizeof parm, __FUNCTION__);
     }
     nl_msg_end_nested(request, offset);
 }
@@ -1749,13 +1804,15 @@ nl_msg_put_act_pop_mpls(struct ofpbuf *request, ovs_be16 proto)
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "mpls");
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
+    nl_msg_put_string(request, TCA_ACT_KIND, "mpls", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS | NLA_F_NESTED);
     {
         struct tc_mpls parm = { .action = TC_ACT_PIPE,
                                 .m_action = TCA_MPLS_ACT_POP };
 
-        nl_msg_put_unspec(request, TCA_MPLS_PARMS, &parm, sizeof parm);
+        nl_msg_put_unspec(request, TCA_MPLS_PARMS, &parm, sizeof parm, __FUNCTION__);
         nl_msg_put_be16(request, TCA_MPLS_PROTO, proto);
     }
     nl_msg_end_nested(request, offset);
@@ -1767,13 +1824,13 @@ nl_msg_put_act_push_mpls(struct ofpbuf *request, ovs_be16 proto,
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "mpls");
+    nl_msg_put_string(request, TCA_ACT_KIND, "mpls", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS | NLA_F_NESTED);
     {
         struct tc_mpls parm = { .action = TC_ACT_PIPE,
                                 .m_action = TCA_MPLS_ACT_PUSH };
 
-        nl_msg_put_unspec(request, TCA_MPLS_PARMS, &parm, sizeof parm);
+        nl_msg_put_unspec(request, TCA_MPLS_PARMS, &parm, sizeof parm, __FUNCTION__);
         nl_msg_put_be16(request, TCA_MPLS_PROTO, proto);
         nl_msg_put_u32(request, TCA_MPLS_LABEL, label);
         nl_msg_put_u8(request, TCA_MPLS_TC, tc);
@@ -1789,13 +1846,13 @@ nl_msg_put_act_set_mpls(struct ofpbuf *request, uint32_t label, uint8_t tc,
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "mpls");
+    nl_msg_put_string(request, TCA_ACT_KIND, "mpls", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS | NLA_F_NESTED);
     {
         struct tc_mpls parm = { .action = TC_ACT_PIPE,
                                 .m_action = TCA_MPLS_ACT_MODIFY };
 
-        nl_msg_put_unspec(request, TCA_MPLS_PARMS, &parm, sizeof parm);
+        nl_msg_put_unspec(request, TCA_MPLS_PARMS, &parm, sizeof parm, __FUNCTION__);
         nl_msg_put_u32(request, TCA_MPLS_LABEL, label);
         nl_msg_put_u8(request, TCA_MPLS_TC, tc);
         nl_msg_put_u8(request, TCA_MPLS_TTL, ttl);
@@ -1809,13 +1866,13 @@ nl_msg_put_act_tunnel_key_release(struct ofpbuf *request)
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "tunnel_key");
+    nl_msg_put_string(request, TCA_ACT_KIND, "tunnel_key", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_tunnel_key tun = { .action = TC_ACT_PIPE,
                                      .t_action = TCA_TUNNEL_KEY_ACT_RELEASE };
 
-        nl_msg_put_unspec(request, TCA_TUNNEL_KEY_PARMS, &tun, sizeof tun);
+        nl_msg_put_unspec(request, TCA_TUNNEL_KEY_PARMS, &tun, sizeof tun, __FUNCTION__);
     }
     nl_msg_end_nested(request, offset);
 }
@@ -1843,7 +1900,7 @@ nl_msg_put_act_tunnel_geneve_option(struct ofpbuf *request,
                         opt->opt_class);
         nl_msg_put_u8(request, TCA_TUNNEL_KEY_ENC_OPT_GENEVE_TYPE, opt->type);
         nl_msg_put_unspec(request, TCA_TUNNEL_KEY_ENC_OPT_GENEVE_DATA, opt + 1,
-                          opt->length * 4);
+                          opt->length * 4, __FUNCTION__);
 
         cnt += sizeof(struct geneve_opt) / 4 + opt->length;
         len -= sizeof(struct geneve_opt) + opt->length * 4;
@@ -1865,13 +1922,13 @@ nl_msg_put_act_tunnel_key_set(struct ofpbuf *request, bool id_present,
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "tunnel_key");
+    nl_msg_put_string(request, TCA_ACT_KIND, "tunnel_key", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_tunnel_key tun = { .action = TC_ACT_PIPE,
                                      .t_action = TCA_TUNNEL_KEY_ACT_SET };
 
-        nl_msg_put_unspec(request, TCA_TUNNEL_KEY_PARMS, &tun, sizeof tun);
+        nl_msg_put_unspec(request, TCA_TUNNEL_KEY_PARMS, &tun, sizeof tun, __FUNCTION__);
 
         ovs_be32 id32 = be64_to_be32(id);
         if (id_present) {
@@ -1906,12 +1963,12 @@ nl_msg_put_act_drop(struct ofpbuf *request)
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "gact");
+    nl_msg_put_string(request, TCA_ACT_KIND, "gact", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_gact p = { .action = TC_ACT_SHOT };
 
-        nl_msg_put_unspec(request, TCA_GACT_PARMS, &p, sizeof p);
+        nl_msg_put_unspec(request, TCA_GACT_PARMS, &p, sizeof p, __FUNCTION__);
     }
     nl_msg_end_nested(request, offset);
 }
@@ -1921,12 +1978,12 @@ nl_msg_put_act_skbedit_to_host(struct ofpbuf *request)
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "skbedit");
+    nl_msg_put_string(request, TCA_ACT_KIND, "skbedit", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_skbedit s = { .action = TC_ACT_PIPE };
 
-        nl_msg_put_unspec(request, TCA_SKBEDIT_PARMS, &s, sizeof s);
+        nl_msg_put_unspec(request, TCA_SKBEDIT_PARMS, &s, sizeof s, __FUNCTION__);
         nl_msg_put_be16(request, TCA_SKBEDIT_PTYPE, PACKET_HOST);
     }
     nl_msg_end_nested(request, offset);
@@ -1938,14 +1995,14 @@ nl_msg_put_act_mirred(struct ofpbuf *request, int ifindex, int action,
 {
     size_t offset;
 
-    nl_msg_put_string(request, TCA_ACT_KIND, "mirred");
+    nl_msg_put_string(request, TCA_ACT_KIND, "mirred", __FUNCTION__);
     offset = nl_msg_start_nested(request, TCA_ACT_OPTIONS);
     {
         struct tc_mirred m = { .action = action,
                                .eaction = eaction,
                                .ifindex = ifindex };
 
-        nl_msg_put_unspec(request, TCA_MIRRED_PARMS, &m, sizeof m);
+        nl_msg_put_unspec(request, TCA_MIRRED_PARMS, &m, sizeof m, __FUNCTION__);
     }
     nl_msg_end_nested(request, offset);
 }
@@ -1953,7 +2010,7 @@ nl_msg_put_act_mirred(struct ofpbuf *request, int ifindex, int action,
 static inline void
 nl_msg_put_act_cookie(struct ofpbuf *request, struct tc_cookie *ck) {
     if (ck->len) {
-        nl_msg_put_unspec(request, TCA_ACT_COOKIE, ck->data, ck->len);
+        nl_msg_put_unspec(request, TCA_ACT_COOKIE, ck->data, ck->len, __FUNCTION__);
     }
 }
 
@@ -1962,7 +2019,7 @@ nl_msg_put_act_flags(struct ofpbuf *request) {
     struct nla_bitfield32 act_flags = { TCA_ACT_FLAGS_NO_PERCPU_STATS,
                                         TCA_ACT_FLAGS_NO_PERCPU_STATS };
 
-    nl_msg_put_unspec(request, TCA_ACT_FLAGS, &act_flags, sizeof act_flags);
+    nl_msg_put_unspec(request, TCA_ACT_FLAGS, &act_flags, sizeof act_flags, __FUNCTION__);
 }
 
 /* Given flower, a key_to_pedit map entry, calculates the rest,
@@ -2280,9 +2337,9 @@ nl_msg_put_masked_value(struct ofpbuf *request, uint16_t type,
         if (is_all_zeros(mask_data, len)) {
             return;
         }
-        nl_msg_put_unspec(request, mask_type, mask_data, len);
+        nl_msg_put_unspec(request, mask_type, mask_data, len, __FUNCTION__);
     }
-    nl_msg_put_unspec(request, type, data, len);
+    nl_msg_put_unspec(request, type, data, len, __FUNCTION__);
 }
 
 static void
@@ -2307,7 +2364,7 @@ nl_msg_put_flower_tunnel_opts(struct ofpbuf *request, uint16_t type,
                         opt->opt_class);
         nl_msg_put_u8(request, TCA_FLOWER_KEY_ENC_OPT_GENEVE_TYPE, opt->type);
         nl_msg_put_unspec(request, TCA_FLOWER_KEY_ENC_OPT_GENEVE_DATA, opt + 1,
-                          opt->length * 4);
+                          opt->length * 4, __FUNCTION__);
 
         cnt += sizeof(struct geneve_opt) / 4 + opt->length;
         len -= sizeof(struct geneve_opt) + opt->length * 4;
@@ -2372,6 +2429,8 @@ nl_msg_put_flower_options(struct ofpbuf *request, struct tc_flower *flower)
     bool is_qinq = is_vlan && eth_type_vlan(flower->key.encap_eth_type[0]);
     bool is_mpls = eth_type_mpls(flower->key.eth_type);
     int err;
+
+    VLOG_INFO("%s: processing...", __FUNCTION__);
 
     /* need to parse acts first as some acts require changing the matching
      * see csum_update_flag()  */
@@ -2507,13 +2566,13 @@ tc_replace_flower(int ifindex, uint16_t prio, uint32_t handle,
 
     index = block_id ? TCM_IFINDEX_MAGIC_BLOCK : ifindex;
     tcmsg = tc_make_request(index, RTM_NEWTFILTER, NLM_F_CREATE | NLM_F_ECHO,
-                            &request);
+                            &request, __FUNCTION__);
     tcmsg->tcm_parent = (hook == TC_EGRESS) ?
                         TC_EGRESS_PARENT : (block_id ? : TC_INGRESS_PARENT);
     tcmsg->tcm_info = tc_make_handle(prio, eth_type);
     tcmsg->tcm_handle = handle;
 
-    nl_msg_put_string(&request, TCA_KIND, "flower");
+    nl_msg_put_string(&request, TCA_KIND, "flower", __FUNCTION__);
     basic_offset = nl_msg_start_nested(&request, TCA_OPTIONS);
     {
         error = nl_msg_put_flower_options(&request, flower);
@@ -2525,7 +2584,7 @@ tc_replace_flower(int ifindex, uint16_t prio, uint32_t handle,
     }
     nl_msg_end_nested(&request, basic_offset);
 
-    error = tc_transact(&request, &reply);
+    error = tc_transact(&request, &reply, __FUNCTION__);
     if (!error) {
         struct tcmsg *tc =
             ofpbuf_at_assert(reply, NLMSG_HDRLEN, sizeof *tc);
@@ -2541,6 +2600,8 @@ tc_replace_flower(int ifindex, uint16_t prio, uint32_t handle,
 void
 tc_set_policy(const char *policy)
 {
+    VLOG_INFO("%s: processing...", __FUNCTION__);
+
     if (!policy) {
         return;
     }

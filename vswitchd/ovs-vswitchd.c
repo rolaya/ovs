@@ -124,7 +124,7 @@ main(int argc, char *argv[])
             memory_report(&usage);
             simap_destroy(&usage);
         }
-        bridge_run();
+        bridge_run(__FUNCTION__);
         unixctl_server_run(unixctl);
         netdev_run();
 

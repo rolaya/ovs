@@ -27,6 +27,7 @@
 #include "sset.h"
 #include "util.h"
 #include "openvswitch/vlog.h"
+#include "debug.h"
 
 VLOG_DEFINE_THIS_MODULE(collectors);
 
@@ -114,7 +115,7 @@ collectors_send(const struct collectors *c, const void *payload, size_t n)
 
         for (i = 0; i < c->n_fds; i++) {
             static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
-            if (send(c->fds[i], payload, n, 0) == -1) {
+            if (SOCK_SEND(c->fds[i], payload, n, 0) == -1) {
                 char *s = describe_fd(c->fds[i]);
                 VLOG_WARN_RL(&rl, "%s: sending to collector failed (%s)",
                              s, ovs_strerror(errno));

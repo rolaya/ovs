@@ -83,7 +83,7 @@ nln_destroy(struct nln *nln)
 {
     if (nln) {
         ovs_assert(ovs_list_is_empty(&nln->all_notifiers));
-        nl_sock_destroy(nln->notify_sock);
+        nl_sock_destroy(nln->notify_sock, __FUNCTION__);
         free(nln);
     }
 }
@@ -106,7 +106,7 @@ nln_notifier_create(struct nln *nln, int multicast_group, nln_notify_func *cb,
     if (!nln->notify_sock) {
         struct nl_sock *sock;
 
-        error = nl_sock_create(nln->protocol, &sock);
+        error = nl_sock_create(nln->protocol, &sock, __FUNCTION__);
         if (error) {
             VLOG_WARN("could not create netlink socket: %s",
                       ovs_strerror(error));
@@ -119,7 +119,7 @@ nln_notifier_create(struct nln *nln, int multicast_group, nln_notify_func *cb,
         nln_run(nln);
     }
 
-    error = nl_sock_join_mcgroup(nln->notify_sock, multicast_group);
+    error = nl_sock_join_mcgroup(nln->notify_sock, multicast_group, __FUNCTION__);
     if (error) {
         VLOG_WARN("could not join netlink multicast group: %s",
                   ovs_strerror(error));
@@ -156,11 +156,11 @@ nln_notifier_destroy(struct nln_notifier *notifier)
             }
         }
         if (count == 0) {
-            nl_sock_leave_mcgroup(nln->notify_sock, notifier->multicast_group);
+            nl_sock_leave_mcgroup(nln->notify_sock, notifier->multicast_group, __FUNCTION__);
         }
 
         if (ovs_list_is_empty(&nln->all_notifiers)) {
-            nl_sock_destroy(nln->notify_sock);
+            nl_sock_destroy(nln->notify_sock, __FUNCTION__);
             nln->notify_sock = NULL;
         }
         free(notifier);
@@ -185,7 +185,7 @@ nln_run(struct nln *nln)
         int error;
 
         ofpbuf_use_stub(&buf, buf_stub, sizeof buf_stub);
-        error = nl_sock_recv(nln->notify_sock, &buf, NULL, false);
+        error = nl_sock_recv(nln->notify_sock, &buf, NULL, false, __FUNCTION__);
         if (!error) {
             int group = nln->parse(&buf, nln->change);
 
@@ -219,7 +219,7 @@ nln_wait(struct nln *nln)
 {
     nln->has_run = false;
     if (nln->notify_sock) {
-        nl_sock_wait(nln->notify_sock, POLLIN);
+        nl_sock_wait(nln->notify_sock, POLLIN, __FUNCTION__);
     }
 }
 

@@ -25,6 +25,7 @@
 #include "socket-util.h"
 #include "syslog-provider.h"
 #include "util.h"
+#include "debug.h"
 
 #define FACILITY_MASK 0x03f8
 
@@ -99,7 +100,7 @@ syslog_direct_log(struct syslogger *this, int pri, const char *msg)
     ds_put_format(&ds, "<%u>%s", pri, msg);
     wire_msg = ds_cstr(&ds);
     send_len = MIN(strlen(wire_msg), max_len);
-    while (send(this_->fd, wire_msg, send_len, 0) < 0 && errno == EMSGSIZE) {
+    while (SOCK_SEND(this_->fd, wire_msg, send_len, 0) < 0 && errno == EMSGSIZE) {
         /* If message was too large for send() function then try to discover
          * max_len supported for this particular socket and retry sending a
          * truncated version of the same message. */

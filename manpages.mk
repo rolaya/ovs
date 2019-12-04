@@ -1,23 +1,5 @@
 # Generated automatically -- do not modify!    -*- buffer-read-only: t -*-
 
-ovn/utilities/ovn-sbctl.8: \
-	ovn/utilities/ovn-sbctl.8.in \
-	lib/common.man \
-	lib/db-ctl-base.man \
-	lib/ovs.tmac \
-	lib/ssl-bootstrap.man \
-	lib/ssl.man \
-	lib/table.man \
-	lib/vlog.man
-ovn/utilities/ovn-sbctl.8.in:
-lib/common.man:
-lib/db-ctl-base.man:
-lib/ovs.tmac:
-lib/ssl-bootstrap.man:
-lib/ssl.man:
-lib/table.man:
-lib/vlog.man:
-
 ovsdb/ovsdb-client.1: \
 	ovsdb/ovsdb-client.1.in \
 	lib/common-syn.man \
@@ -115,6 +97,12 @@ lib/ovs.tmac:
 lib/vlog-syn.man:
 lib/vlog.man:
 ovsdb/ovsdb-schemas.man:
+
+utilities/bugtool/ovs-bugtool.8: \
+	utilities/bugtool/ovs-bugtool.8.in \
+	lib/ovs.tmac
+utilities/bugtool/ovs-bugtool.8.in:
+lib/ovs.tmac:
 
 utilities/ovs-appctl.8: \
 	utilities/ovs-appctl.8.in \

@@ -298,7 +298,7 @@ int netdev_get_n_queues(const struct netdev *,
 int netdev_get_qos(const struct netdev *,
                    const char **typep, struct smap *details);
 int netdev_set_qos(struct netdev *,
-                   const char *type, const struct smap *details);
+                   const char *type, const struct smap *details, const char* caller);
 
 int netdev_get_queue(const struct netdev *,
                      unsigned int queue_id, struct smap *details);

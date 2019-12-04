@@ -23,7 +23,7 @@ struct simap;
 void bridge_init(const char *remote);
 void bridge_exit(bool delete_datapath);
 
-void bridge_run(void);
+void bridge_run(const char* caller);
 void bridge_wait(void);
 
 void bridge_get_memory_usage(struct simap *usage);

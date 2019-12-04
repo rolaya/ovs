@@ -1352,7 +1352,7 @@ check_ct_timeout_policy(struct dpif_backer *backer)
      * datapath will accept a timeout policy even without commit.  This is
      * useful as we do not want to persist the probe connection in the
      * conntrack table. */
-    nl_msg_put_string(&actions, OVS_CT_ATTR_TIMEOUT, "ovs_test_tp");
+    nl_msg_put_string(&actions, OVS_CT_ATTR_TIMEOUT, "ovs_test_tp", __FUNCTION__);
     nl_msg_end_nested(&actions, ct_start);
 
     /* Compose a dummy UDP packet. */

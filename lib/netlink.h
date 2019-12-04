@@ -62,7 +62,7 @@ void *nl_msg_push_uninit(struct ofpbuf *, size_t);
 /* Appending attributes. */
 void *nl_msg_put_unspec_uninit(struct ofpbuf *, uint16_t type, size_t);
 void *nl_msg_put_unspec_zero(struct ofpbuf *, uint16_t type, size_t);
-void nl_msg_put_unspec(struct ofpbuf *, uint16_t type, const void *, size_t);
+void nl_msg_put_unspec(struct ofpbuf *, uint16_t type, const void *, size_t, const char* caller);
 void nl_msg_put_flag(struct ofpbuf *, uint16_t type);
 void nl_msg_put_u8(struct ofpbuf *, uint16_t type, uint8_t value);
 void nl_msg_put_u16(struct ofpbuf *, uint16_t type, uint16_t value);
@@ -78,7 +78,7 @@ void nl_msg_put_in6_addr(struct ofpbuf *msg, uint16_t type,
 void nl_msg_put_odp_port(struct ofpbuf *, uint16_t type, odp_port_t value);
 void nl_msg_put_string__(struct ofpbuf *, uint16_t type, const char *value,
                          size_t len);
-void nl_msg_put_string(struct ofpbuf *, uint16_t type, const char *value);
+void nl_msg_put_string(struct ofpbuf *, uint16_t type, const char *value, const char* caller);
 
 size_t nl_msg_start_nested(struct ofpbuf *, uint16_t type);
 void nl_msg_end_nested(struct ofpbuf *, size_t offset);

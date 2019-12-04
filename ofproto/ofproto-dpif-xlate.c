@@ -5997,7 +5997,7 @@ put_ct_label(const struct flow *flow, struct ofpbuf *odp_actions,
         odp_ct_label.key = ovs_u128_and(flow->ct_label, wc->masks.ct_label);
         odp_ct_label.mask = wc->masks.ct_label;
         nl_msg_put_unspec(odp_actions, OVS_CT_ATTR_LABELS,
-                          &odp_ct_label, sizeof odp_ct_label);
+                          &odp_ct_label, sizeof odp_ct_label, __FUNCTION__);
     }
 }
 
@@ -6008,10 +6008,10 @@ put_ct_helper(struct xlate_ctx *ctx,
     if (ofc->alg) {
         switch(ofc->alg) {
         case IPPORT_FTP:
-            nl_msg_put_string(odp_actions, OVS_CT_ATTR_HELPER, "ftp");
+            nl_msg_put_string(odp_actions, OVS_CT_ATTR_HELPER, "ftp", __FUNCTION__);
             break;
         case IPPORT_TFTP:
-            nl_msg_put_string(odp_actions, OVS_CT_ATTR_HELPER, "tftp");
+            nl_msg_put_string(odp_actions, OVS_CT_ATTR_HELPER, "tftp", __FUNCTION__);
             break;
         default:
             xlate_report_error(ctx, "cannot serialize ct_helper %d", ofc->alg);
@@ -6030,7 +6030,7 @@ put_ct_timeout(struct ofpbuf *odp_actions, const struct dpif_backer *backer,
 
     if (ofproto_dpif_ct_zone_timeout_policy_get_name(backer, zone_id,
             ntohs(flow->dl_type), flow->nw_proto, &tp_name, &unwildcard)) {
-        nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, tp_name);
+        nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, tp_name, __FUNCTION__);
 
         if (unwildcard) {
             /* The underlying datapath requires separate timeout
@@ -6077,13 +6077,13 @@ put_ct_nat(struct xlate_ctx *ctx)
         } else if (ofn->range_af == AF_INET6) {
             nl_msg_put_unspec(ctx->odp_actions, OVS_NAT_ATTR_IP_MIN,
                               &ofn->range.addr.ipv6.min,
-                              sizeof ofn->range.addr.ipv6.min);
+                              sizeof ofn->range.addr.ipv6.min, __FUNCTION__);
             if (!ipv6_mask_is_any(&ofn->range.addr.ipv6.max) &&
                 memcmp(&ofn->range.addr.ipv6.max, &ofn->range.addr.ipv6.min,
                        sizeof ofn->range.addr.ipv6.max) > 0) {
                 nl_msg_put_unspec(ctx->odp_actions, OVS_NAT_ATTR_IP_MAX,
                                   &ofn->range.addr.ipv6.max,
-                                  sizeof ofn->range.addr.ipv6.max);
+                                  sizeof ofn->range.addr.ipv6.max, __FUNCTION__);
             }
         }
         if (ofn->range_af != AF_UNSPEC && ofn->range.proto.min) {

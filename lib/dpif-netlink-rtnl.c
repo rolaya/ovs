@@ -134,9 +134,9 @@ rtnl_transact(uint32_t type, uint32_t flags, const char *name,
     ofpbuf_init(&request, 0);
     nl_msg_put_nlmsghdr(&request, 0, type, flags);
     ofpbuf_put_zeros(&request, sizeof(struct ifinfomsg));
-    nl_msg_put_string(&request, IFLA_IFNAME, name);
+    nl_msg_put_string(&request, IFLA_IFNAME, name, __FUNCTION__);
 
-    err = nl_transact(NETLINK_ROUTE, &request, reply);
+    err = nl_transact(NETLINK_ROUTE, &request, reply, __FUNCTION__);
     ofpbuf_uninit(&request);
 
     return err;
@@ -294,10 +294,10 @@ rtnl_set_mtu(const char *name, uint32_t mtu, struct ofpbuf *request)
     nl_msg_put_nlmsghdr(request, 0, RTM_SETLINK,
                         NLM_F_REQUEST | NLM_F_ACK);
     ofpbuf_put_zeros(request, sizeof(struct ifinfomsg));
-    nl_msg_put_string(request, IFLA_IFNAME, name);
+    nl_msg_put_string(request, IFLA_IFNAME, name, __FUNCTION__);
     nl_msg_put_u32(request, IFLA_MTU, mtu);
 
-    return nl_transact(NETLINK_ROUTE, request, NULL);
+    return nl_transact(NETLINK_ROUTE, request, NULL, __FUNCTION__);
 }
 
 static int
@@ -323,10 +323,10 @@ dpif_netlink_rtnl_create(const struct netdev_tunnel_config *tnl_cfg,
     nl_msg_put_nlmsghdr(&request, 0, RTM_NEWLINK, flags);
     ifinfo = ofpbuf_put_zeros(&request, sizeof(struct ifinfomsg));
     ifinfo->ifi_change = ifinfo->ifi_flags = IFF_UP;
-    nl_msg_put_string(&request, IFLA_IFNAME, name);
+    nl_msg_put_string(&request, IFLA_IFNAME, name, __FUNCTION__);
     nl_msg_put_u32(&request, IFLA_MTU, MAX_MTU);
     linkinfo_off = nl_msg_start_nested(&request, IFLA_LINKINFO);
-    nl_msg_put_string(&request, IFLA_INFO_KIND, kind);
+    nl_msg_put_string(&request, IFLA_INFO_KIND, kind, __FUNCTION__);
     infodata_off = nl_msg_start_nested(&request, IFLA_INFO_DATA);
 
     /* tunnel unique info */
@@ -368,7 +368,7 @@ dpif_netlink_rtnl_create(const struct netdev_tunnel_config *tnl_cfg,
     nl_msg_end_nested(&request, infodata_off);
     nl_msg_end_nested(&request, linkinfo_off);
 
-    err = nl_transact(NETLINK_ROUTE, &request, NULL);
+    err = nl_transact(NETLINK_ROUTE, &request, NULL, __FUNCTION__);
     if (!err && (type == OVS_VPORT_TYPE_GRE ||
                  type == OVS_VPORT_TYPE_IP6GRE)) {
         /* Work around a bug in kernel GRE driver, which ignores IFLA_MTU in

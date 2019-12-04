@@ -1461,7 +1461,7 @@ parse_odp_userspace_action(const char *s, struct ofpbuf *actions)
                      &eth_type, &n1)) {
 
             nl_msg_put_unspec(actions, OVS_ACTION_ATTR_PUSH_ETH,
-                              &push, sizeof push);
+                              &push, sizeof push, __FUNCTION__);
 
             res = n + n1;
             goto out;
@@ -1890,10 +1890,10 @@ nl_msg_put_ct_nat(struct ct_nat_params *p, struct ofpbuf *actions)
     }
     if (p->addr_len != 0) {
         nl_msg_put_unspec(actions, OVS_NAT_ATTR_IP_MIN, &p->addr_min,
-                          p->addr_len);
+                          p->addr_len, __FUNCTION__);
         if (memcmp(&p->addr_max, &p->addr_min, p->addr_len) > 0) {
             nl_msg_put_unspec(actions, OVS_NAT_ATTR_IP_MAX, &p->addr_max,
-                              p->addr_len);
+                              p->addr_len, __FUNCTION__);
         }
         if (p->proto_min) {
             nl_msg_put_u16(actions, OVS_NAT_ATTR_PROTO_MIN, p->proto_min);
@@ -2039,11 +2039,11 @@ find_end:
         }
         if (ct_mark.mask) {
             nl_msg_put_unspec(actions, OVS_CT_ATTR_MARK, &ct_mark,
-                              sizeof(ct_mark));
+                              sizeof(ct_mark), __FUNCTION__);
         }
         if (!ovs_u128_is_zero(ct_label.mask)) {
             nl_msg_put_unspec(actions, OVS_CT_ATTR_LABELS, &ct_label,
-                              sizeof ct_label);
+                              sizeof ct_label, __FUNCTION__);
         }
         if (helper) {
             nl_msg_put_string__(actions, OVS_CT_ATTR_HELPER, helper,
@@ -2077,21 +2077,21 @@ nsh_key_to_attr(struct ofpbuf *buf, const struct ovs_key_nsh *nsh,
     base.path_hdr = nsh->path_hdr;
 
     nsh_key_ofs = nl_msg_start_nested(buf, OVS_KEY_ATTR_NSH);
-    nl_msg_put_unspec(buf, OVS_NSH_KEY_ATTR_BASE, &base, sizeof base);
+    nl_msg_put_unspec(buf, OVS_NSH_KEY_ATTR_BASE, &base, sizeof base, __FUNCTION__);
 
     if (is_mask) {
         nl_msg_put_unspec(buf, OVS_NSH_KEY_ATTR_MD1, nsh->context,
-                          sizeof nsh->context);
+                          sizeof nsh->context, __FUNCTION__);
     } else {
         switch (nsh->mdtype) {
         case NSH_M_TYPE1:
             nl_msg_put_unspec(buf, OVS_NSH_KEY_ATTR_MD1, nsh->context,
-                              sizeof nsh->context);
+                              sizeof nsh->context, __FUNCTION__);
             break;
         case NSH_M_TYPE2:
             if (metadata && md_size > 0) {
                 nl_msg_put_unspec(buf, OVS_NSH_KEY_ATTR_MD2, metadata,
-                                  md_size);
+                                  md_size, __FUNCTION__);
             }
             break;
         default:
@@ -2388,7 +2388,7 @@ parse_odp_action__(struct parse_odp_context *context, const char *s,
                                   | (pcp << VLAN_PCP_SHIFT)
                                   | (cfi ? VLAN_CFI : 0));
             nl_msg_put_unspec(actions, OVS_ACTION_ATTR_PUSH_VLAN,
-                              &push, sizeof push);
+                              &push, sizeof push, __FUNCTION__);
 
             return n;
         }
@@ -3141,7 +3141,7 @@ tun_key_to_attr(struct ofpbuf *a, const struct flow_tnl *tun_key,
             set_hwid(&opts.u.md2, tun_key->erspan_hwid);
         }
         nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS,
-                          &opts, sizeof(opts));
+                          &opts, sizeof(opts), __FUNCTION__);
     }
 
     nl_msg_end_nested(a, tun_key_ofs);
@@ -5327,7 +5327,7 @@ geneve_to_attr(struct ofpbuf *a, const void *data_)
     const struct geneve_scan *geneve = data_;
 
     nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS, geneve->d,
-                      geneve->len);
+                      geneve->len, __FUNCTION__);
 }
 
 static void
@@ -5336,7 +5336,7 @@ erspan_to_attr(struct ofpbuf *a, const void *data_)
     const struct erspan_metadata *md = data_;
 
     nl_msg_put_unspec(a, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS, md,
-                      sizeof *md);
+                      sizeof *md, __FUNCTION__);
 }
 
 #define SCAN_PUT_ATTR(BUF, ATTR, DATA, FUNC)                      \
@@ -5347,7 +5347,7 @@ erspan_to_attr(struct ofpbuf *a, const void *data_)
             fn func = FUNC;                                       \
             func(BUF, &(DATA));                                   \
         } else {                                                  \
-            nl_msg_put_unspec(BUF, ATTR, &(DATA), sizeof (DATA)); \
+            nl_msg_put_unspec(BUF, ATTR, &(DATA), sizeof (DATA), __FUNCTION__); \
         }                                                         \
     }
 
@@ -5488,7 +5488,7 @@ erspan_to_attr(struct ofpbuf *a, const void *data_)
     field++;
 
 #define SCAN_PUT_ATTR_ARRAY(BUF, ATTR, DATA, CNT)                    \
-    nl_msg_put_unspec(BUF, ATTR, &(DATA), sizeof (DATA)[0] * (CNT)); \
+    nl_msg_put_unspec(BUF, ATTR, &(DATA), sizeof (DATA)[0] * (CNT), __FUNCTION__); \
 
 #define SCAN_PUT_ARRAY(ATTR, CNT)                        \
     SCAN_PUT_ATTR_ARRAY(key, ATTR, skey, CNT);       \
@@ -6022,7 +6022,7 @@ odp_flow_key_from_flow__(const struct odp_flow_key_parms *parms,
     }
     if (parms->support.ct_label) {
         nl_msg_put_unspec(buf, OVS_KEY_ATTR_CT_LABELS, &data->ct_label,
-                          sizeof(data->ct_label));
+                          sizeof(data->ct_label), __FUNCTION__);
     }
     if (flow->ct_nw_proto) {
         if (parms->support.ct_orig_tuple
@@ -6035,7 +6035,7 @@ odp_flow_key_from_flow__(const struct odp_flow_key_parms *parms,
                 data->ct_nw_proto,
             };
             nl_msg_put_unspec(buf, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4, &ct,
-                              sizeof ct);
+                              sizeof ct, __FUNCTION__);
         } else if (parms->support.ct_orig_tuple6
                    && flow->dl_type == htons(ETH_TYPE_IPV6)) {
             struct ovs_key_ct_tuple_ipv6 ct = {
@@ -6046,7 +6046,7 @@ odp_flow_key_from_flow__(const struct odp_flow_key_parms *parms,
                 data->ct_nw_proto,
             };
             nl_msg_put_unspec(buf, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6, &ct,
-                              sizeof ct);
+                              sizeof ct, __FUNCTION__);
         }
     }
     if (parms->support.recirc) {
@@ -6284,19 +6284,19 @@ odp_key_from_dp_packet(struct ofpbuf *buf, const struct dp_packet *packet)
         }
         if (!ovs_u128_is_zero(md->ct_label)) {
             nl_msg_put_unspec(buf, OVS_KEY_ATTR_CT_LABELS, &md->ct_label,
-                              sizeof(md->ct_label));
+                              sizeof(md->ct_label), __FUNCTION__);
         }
         if (md->ct_orig_tuple_ipv6) {
             if (md->ct_orig_tuple.ipv6.ipv6_proto) {
                 nl_msg_put_unspec(buf, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6,
                                   &md->ct_orig_tuple.ipv6,
-                                  sizeof md->ct_orig_tuple.ipv6);
+                                  sizeof md->ct_orig_tuple.ipv6, __FUNCTION__);
             }
         } else {
             if (md->ct_orig_tuple.ipv4.ipv4_proto) {
                 nl_msg_put_unspec(buf, OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4,
                                   &md->ct_orig_tuple.ipv4,
-                                  sizeof md->ct_orig_tuple.ipv4);
+                                  sizeof md->ct_orig_tuple.ipv4, __FUNCTION__);
             }
         }
     }
@@ -7467,7 +7467,7 @@ odp_put_push_eth_action(struct ofpbuf *odp_actions,
     }
 
     nl_msg_put_unspec(odp_actions, OVS_ACTION_ATTR_PUSH_ETH,
-                      &eth, sizeof eth);
+                      &eth, sizeof eth, __FUNCTION__);
 }
 
 void
@@ -7486,7 +7486,7 @@ odp_put_tnl_push_action(struct ofpbuf *odp_actions,
     int size = offsetof(struct ovs_action_push_tnl, header);
 
     size += data->header_len;
-    nl_msg_put_unspec(odp_actions, OVS_ACTION_ATTR_TUNNEL_PUSH, data, size);
+    nl_msg_put_unspec(odp_actions, OVS_ACTION_ATTR_TUNNEL_PUSH, data, size, __FUNCTION__);
 }
 
 
@@ -7497,7 +7497,7 @@ commit_set_action(struct ofpbuf *odp_actions, enum ovs_key_attr key_type,
                   const void *key, size_t key_size)
 {
     size_t offset = nl_msg_start_nested(odp_actions, OVS_ACTION_ATTR_SET);
-    nl_msg_put_unspec(odp_actions, key_type, key, key_size);
+    nl_msg_put_unspec(odp_actions, key_type, key, key_size, __FUNCTION__);
     nl_msg_end_nested(odp_actions, offset);
 }
 
@@ -7665,7 +7665,7 @@ commit_vlan_action(const struct flow* flow, struct flow *base,
         vlan.vlan_tpid = flow->vlans[flow_n].tpid;
         vlan.vlan_tci = flow->vlans[flow_n].tci;
         nl_msg_put_unspec(odp_actions, OVS_ACTION_ATTR_PUSH_VLAN,
-                          &vlan, sizeof vlan);
+                          &vlan, sizeof vlan, __FUNCTION__);
     }
     memcpy(base->vlans, flow->vlans, sizeof(base->vlans));
 }
