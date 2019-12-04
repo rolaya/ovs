@@ -1,19 +1,30 @@
 #!/bin/sh
 
-# Display some helpers to the user
-echo "\"ovs_start_test\"     - Starts OVS daemons, deploys network configuration and configures QoS"
-echo "\"ovs_stop_test\"      - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
-echo
-echo "\"ovs_deploy_network\" - Deploys network configuration"
-echo "\"ovs_set_qos\"        - Configures QoS"
-echo "\"ovs_vm_set_qos\"     - Configures QoS for specific vm3 (vm attached to tap_port3)"
-echo "\"ovs_purge_network\"  - Purge deployed network (and QoS)"
+
 
 # The name of the physical wired interface (host specific)
 wired_iface=enp5s0
 
 # The name of the OVS bridge to create
 ovs_bridge=br0
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_show_menu()
+{
+  # Display some helpers to the user
+  echo "\"ovs_show_menu\"                 - Displays this menu"
+  echo "\"ovs_start_test\"                - Starts OVS daemons, deploys network configuration and configures QoS"
+  echo "\"ovs_stop_test\"                 - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
+  echo
+  echo "\"ovs_deploy_network\"            - Deploys network configuration"
+  echo "\"ovs_set_qos\"                   - Configures QoS"
+  echo "\"ovs_vm_set_qos\"                - Configures QoS for specific vm3 (vm attached to tap_port3)"
+  echo "\"ovs_vm_set_qos_netem_latency\"  - Configure latency (netem) on specified port"
+  echo "                                  ex: ovs_vm_set_qos_netem_latency tap_port3 2000000"
+  echo "\"ovs_purge_network\"             - Purge deployed network (and QoS)"
+}
 
 #==================================================================================================================
 # 
@@ -280,6 +291,29 @@ ovs_vm_set_qos()
 }
 
 #==================================================================================================================
+#
+#==================================================================================================================
+ovs_vm_set_qos_netem_latency()
+{
+  local tap_port=$1
+  local latency=$2
+
+  # Configure (netem latency) traffic shaping on interface.
+  
+  echo "Setting latency: [$latency] in port: [$tap_port]"
+  
+  ovs-vsctl -- \
+  set interface $tap_port ofport_request=7 -- \
+  set port $wired_iface qos=@qos_netem_latency -- \
+  --id=@qos_netem_latency create qos type=linux-netem \
+      other-config:latency=$latency \
+      queues:122=@$tap_port_queue -- \
+  --id=@$tap_port_queue create queue other-config:latency=$latency
+
+  ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal
+}
+
+#==================================================================================================================
 # 
 #==================================================================================================================
 ovs_purge_network()
@@ -342,3 +376,6 @@ ovs_install()
   sudo make install
   sudo make modules_install
 }
+
+# Display ovs helper "menu"
+ovs_show_menu
