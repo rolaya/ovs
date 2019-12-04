@@ -1,9 +1,10 @@
 #!/bin/sh
 
-
-
 # The name of the physical wired interface (host specific)
 wired_iface=enp5s0
+
+# The IP address assigned (by the DHCP server) to the physical wired interface (host specific)
+wired_iface_ip=192.168.1.206
 
 # The name of the OVS bridge to create
 ovs_bridge=br0
@@ -13,11 +14,23 @@ ovs_bridge=br0
 #==================================================================================================================
 ovs_show_menu()
 {
-  # Display some helpers to the user
+  # Display current hardcoded configuration 
+  echo
+  echo "Current configuration (currently hardcoded)"
+  echo "Wired interface:            [$wired_iface]"
+  echo "Wired interface IP address: [$wired_iface_ip]"
+  echo "Manually update these values in this file according to your network configuration"
+  echo
+  echo
+	# Display some helpers to the user
+  echo "Main commands"
+  echo "=========================================================================================================================="
   echo "\"ovs_show_menu\"                     - Displays this menu"
   echo "\"ovs_start_test\"                    - Starts OVS daemons, deploys network configuration and configures QoS"
   echo "\"ovs_stop_test\"                     - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
   echo
+  echo "Network deployment and QoS configuration commands"
+  echo "=========================================================================================================================="
   echo "\"ovs_deploy_network\"                - Deploys network configuration"
   echo "\"ovs_set_qos\"                       - Configures QoS"
   echo "\"ovs_vm_set_qos\"                    - Configures QoS for specific vm3 (vm attached to tap_port3)"
@@ -28,7 +41,7 @@ ovs_show_menu()
   echo "\"ovs_purge_network\"                 - Purge deployed network (and QoS)"
   echo
   echo "Project build/install related commands"
-  echo "======================================"
+  echo "=========================================================================================================================="
   echo "\"ovs_install\"                       - Builds and installs OVS daemons and kernel modules"
   echo "\"ovs_configure_debug_build\"         - Configures OVS project for debug build"
   echo "\"ovs_configure_release_build\"       - Configures OVS project for release build"
@@ -167,7 +180,7 @@ ovs_deploy_network()
   # For simplicity, I configured my verizon router to always assign this
   # ip address (192.168.1.206) to "this" host (i.e. the host where I am 
   # deploying ovs).
-  ip addr del 192.168.1.206/24 dev $wired_iface
+  ip addr del $wired_iface_ip/24 dev $wired_iface
 
   # Acquire ip address and assign it to the "br0" bridge/interface
   dhclient $ovs_bridge
@@ -208,7 +221,7 @@ ovs_run_test()
   
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
-  ip addr del 192.168.1.206/24 dev $wired_iface
+  ip addr del $wired_iface_ip/24 dev $wired_iface
   
   ovs-ctl start
 
