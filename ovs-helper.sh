@@ -14,22 +14,24 @@ ovs_bridge=br0
 ovs_show_menu()
 {
   # Display some helpers to the user
-  echo "\"ovs_show_menu\"                 - Displays this menu"
-  echo "\"ovs_start_test\"                - Starts OVS daemons, deploys network configuration and configures QoS"
-  echo "\"ovs_stop_test\"                 - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
+  echo "\"ovs_show_menu\"                     - Displays this menu"
+  echo "\"ovs_start_test\"                    - Starts OVS daemons, deploys network configuration and configures QoS"
+  echo "\"ovs_stop_test\"                     - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
   echo
-  echo "\"ovs_deploy_network\"            - Deploys network configuration"
-  echo "\"ovs_set_qos\"                   - Configures QoS"
-  echo "\"ovs_vm_set_qos\"                - Configures QoS for specific vm3 (vm attached to tap_port3)"
-  echo "\"ovs_vm_set_qos_netem_latency\"  - Configure latency (netem) on specified port"
-  echo "                                  ex: ovs_vm_set_qos_netem_latency tap_port3 2000000"
-  echo "\"ovs_purge_network\"             - Purge deployed network (and QoS)"
+  echo "\"ovs_deploy_network\"                - Deploys network configuration"
+  echo "\"ovs_set_qos\"                       - Configures QoS"
+  echo "\"ovs_vm_set_qos\"                    - Configures QoS for specific vm3 (vm attached to tap_port3)"
+  echo "\"ovs_vm_set_qos_netem_latency\"      - Configure latency (netem) on specified port"
+  echo "                                      ex: ovs_vm_set_qos_netem_latency tap_port3 2000000"
+  echo "\"ovs_vm_set_qos_netem_packet_loss\"  - Configure packet loss as a percentage (netem) on specified port"
+  echo "                                      ex: ovs_vm_set_qos_netem_packet_loss tap_port3 10"
+  echo "\"ovs_purge_network\"                 - Purge deployed network (and QoS)"
   echo
   echo "Project build/install related commands"
   echo "======================================"
-  echo "\"ovs_install\"                   - Builds and installs OVS daemons and kernel modules"
-  echo "\"ovs_configure_debug_build\"     - Configures OVS project for debug build"
-  echo "\"ovs_configure_release_build\"   - Configures OVS project for release build"
+  echo "\"ovs_install\"                       - Builds and installs OVS daemons and kernel modules"
+  echo "\"ovs_configure_debug_build\"         - Configures OVS project for debug build"
+  echo "\"ovs_configure_release_build\"       - Configures OVS project for release build"
 }
 
 #==================================================================================================================
@@ -315,6 +317,29 @@ ovs_vm_set_qos_netem_latency()
       other-config:latency=$latency \
       queues:122=@$tap_port_queue -- \
   --id=@$tap_port_queue create queue other-config:latency=$latency
+
+  ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_vm_set_qos_netem_packet_loss()
+{
+  local tap_port=$1
+  local packet_loss=$2
+
+  # Configure (netem packet loss) traffic shaping on interface.
+  
+  echo "Setting packet loss: [$packet_loss%] in port: [$tap_port]"
+  
+  ovs-vsctl -- \
+  set interface $tap_port ofport_request=7 -- \
+  set port $wired_iface qos=@qos_netem_pkt_loss -- \
+  --id=@qos_netem_pkt_loss create qos type=linux-netem \
+      other-config:loss=$packet_loss \
+      queues:122=@$tap_port_queue -- \
+  --id=@$tap_port_queue create queue other-config:loss=$packet_loss
 
   ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal
 }
