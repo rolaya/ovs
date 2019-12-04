@@ -24,6 +24,12 @@ ovs_show_menu()
   echo "\"ovs_vm_set_qos_netem_latency\"  - Configure latency (netem) on specified port"
   echo "                                  ex: ovs_vm_set_qos_netem_latency tap_port3 2000000"
   echo "\"ovs_purge_network\"             - Purge deployed network (and QoS)"
+  echo
+  echo "Project build/install related commands"
+  echo "======================================"
+  echo "\"ovs_install\"                   - Builds and installs OVS daemons and kernel modules"
+  echo "\"ovs_configure_debug_build\"     - Configures OVS project for debug build"
+  echo "\"ovs_configure_release_build\"   - Configures OVS project for release build"
 }
 
 #==================================================================================================================
@@ -371,8 +377,27 @@ ovs_stop_test()
 #==================================================================================================================
 #
 #==================================================================================================================
+ovs_configure_debug_build()
+{
+  make clean
+  ./configure CFLAGS="-g -O0 -fsanitize=address -fno-omit-frame-pointer -fno-common" --with-linux=/lib/modules/$(uname -r)/build
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_configure_release_build()
+{
+  make clean
+  ./configure --with-linux=/lib/modules/$(uname -r)/build
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
 ovs_install()
 {
+  make
   sudo make install
   sudo make modules_install
 }
