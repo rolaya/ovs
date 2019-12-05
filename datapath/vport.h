@@ -38,7 +38,7 @@ struct vport_parms;
 int ovs_vport_init(void);
 void ovs_vport_exit(void);
 
-struct vport *ovs_vport_add(const struct vport_parms *);
+struct vport *ovs_vport_add(const struct vport_parms *, const char* caller);
 void ovs_vport_del(struct vport *);
 
 struct vport *ovs_vport_locate(const struct net *net, const char *name);

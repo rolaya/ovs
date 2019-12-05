@@ -29,6 +29,7 @@
 #include "random.h"
 #include "util.h"
 #include "openvswitch/vlog.h"
+#include "debug.h"
 
 VLOG_DEFINE_THIS_MODULE(socket_util_unix);
 
@@ -90,7 +91,7 @@ drain_rcvbuf(int fd)
          * On other Unix-like OSes, MSG_TRUNC has no effect in the flags
          * argument. */
         char buffer[LINUX ? 1 : 2048];
-        ssize_t n_bytes = recv(fd, buffer, sizeof buffer,
+        ssize_t n_bytes = SOCK_RECV(fd, buffer, sizeof buffer,
                                MSG_TRUNC | MSG_DONTWAIT);
         if (n_bytes <= 0 || n_bytes >= rcvbuf) {
             break;

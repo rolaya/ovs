@@ -40,6 +40,7 @@
 #include "gso.h"
 #include "vport.h"
 #include "vport-internal_dev.h"
+//#include "../lib/debug.h"
 
 static LIST_HEAD(vport_ops_list);
 static bool compat_gre_loaded = false;
@@ -282,10 +283,22 @@ static struct vport_ops *ovs_vport_lookup(const struct vport_parms *parms)
  * Creates a new vport with the specified configuration (which is dependent on
  * device type).  ovs_mutex must be held.
  */
-struct vport *ovs_vport_add(const struct vport_parms *parms)
+struct vport *ovs_vport_add(const struct vport_parms *parms, const char* caller)
 {
 	struct vport_ops *ops;
 	struct vport *vport;
+	
+	pr_info("%s: ovs vport: [%s] type: [%d] caller: [%s]\n", 
+		__FUNCTION__, 
+		parms->name,
+		parms->type, 
+		caller);
+
+	/*pr_info("%s: ovs vport: [%s] type: [%s] caller: [%s]\n", 
+		__FUNCTION__, 
+		parms->name,
+		ovs_vport_type_to_string(parms->type), 
+		caller);*/
 
 	ops = ovs_vport_lookup(parms);
 	if (ops) {

@@ -33,6 +33,7 @@
 #include "unixctl.h"
 #include "util.h"
 #include "openvswitch/vlog.h"
+#include "debug.h"
 
 OVS_NO_RETURN static void usage(void);
 static void parse_options(int argc, char *argv[]);
@@ -214,7 +215,7 @@ test_netflow_main(int argc, char *argv[])
 
         ofpbuf_clear(&buf);
         do {
-            retval = recv(sock, buf.data, buf.allocated, 0);
+            retval = SOCK_RECV(sock, buf.data, buf.allocated, 0);
         } while (retval < 0 && errno == EINTR);
         if (retval > 0) {
             ofpbuf_put_uninit(&buf, retval);

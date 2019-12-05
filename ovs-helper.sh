@@ -22,7 +22,7 @@ ovs_show_menu()
   echo "Manually update these values in this file according to your network configuration"
   echo
   echo
-	# Display some helpers to the user
+  # Display some helpers to the user
   echo "Main commands"
   echo "=========================================================================================================================="
   echo "\"ovs_show_menu\"                     - Displays this menu"
@@ -54,11 +54,37 @@ ovs_override_kernel_modules()
 {
   config_file="/etc/depmod.d/openvswitch.conf"
 
+  echo "Updating configuration file: [$config_file]..."
+
   for module in datapath/linux/*.ko; do
     modname="$(basename ${module})"
+  
+    echo "Appending module: [$modname]..."
+
     echo "override ${modname%.ko} * extra" >> "$config_file"
     echo "override ${modname%.ko} * weak-updates" >> "$config_file"
   done
+
+  echo "Generating list of kernel module dependencies..."
+
+  sudo depmod -a -v -w
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_update_openvswitch_module()
+{
+  local module="openvswitch.ko"
+  local replacement_module="/lib/modules/5.0.0-rc8/extra/openvswitch.ko"
+
+  echo "Unloading module: [$module]..."
+  sudo rmmod $module
+  
+  echo "Loading module: [$replacement_module]..."
+  sudo insmod $replacement_module
+
+  sudo modinfo $replacement_module
 }
 
 #==================================================================================================================

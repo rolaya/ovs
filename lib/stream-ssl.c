@@ -46,6 +46,8 @@
 #include "stream.h"
 #include "timeval.h"
 #include "openvswitch/vlog.h"
+#include "debug.h"
+
 
 #ifdef _WIN32
 /* Ref: https://www.openssl.org/support/faq.html#PROG2
@@ -527,7 +529,7 @@ ssl_connect(struct stream *stream)
         /* Capture the first few bytes of received data so that we can guess
          * what kind of funny data we've been sent if SSL negotiation fails. */
         if (sslv->n_head <= 0) {
-            sslv->n_head = recv(sslv->fd, sslv->head, sizeof sslv->head,
+            sslv->n_head = SOCK_RECV(sslv->fd, sslv->head, sizeof sslv->head,
                                 MSG_PEEK);
         }
 

@@ -456,6 +456,46 @@ char* tca_to_string(uint16_t type)
   return tca_name;
 }
 
+//==================================================================================================================
+//
+//==================================================================================================================
+char* ovs_vport_type_to_string(int ovs_vport_type)
+{
+  char *ovs_vport_type_name;
+
+  switch(ovs_vport_type)
+  {
+  case OVS_VPORT_TYPE_UNSPEC:
+    ovs_vport_type_name = "OVS_VPORT_TYPE_UNSPEC";
+    break;
+
+  case OVS_VPORT_TYPE_NETDEV:
+    ovs_vport_type_name = "OVS_VPORT_TYPE_NETDEV";
+    break;
+
+  case OVS_VPORT_TYPE_INTERNAL:
+    ovs_vport_type_name = "OVS_VPORT_TYPE_INTERNAL";
+    break;
+
+  case OVS_VPORT_TYPE_GRE:
+    ovs_vport_type_name = "OVS_VPORT_TYPE_GRE";
+    break;
+  
+  case OVS_VPORT_TYPE_VXLAN:
+    ovs_vport_type_name = "OVS_VPORT_TYPE_VXLAN";
+    break;
+
+  case OVS_VPORT_TYPE_GENEVE:
+    ovs_vport_type_name = "OVS_VPORT_TYPE_GENEVE";
+    break;
+
+  default:
+    ovs_vport_type_name = "OVS_VPORT_TYPE_???";
+    break;
+  }
+
+  return ovs_vport_type_name;
+}
 
 //==================================================================================================================
 //
@@ -482,12 +522,81 @@ ssize_t dbg_sock_sendmsg(int fd, const struct msghdr *msg, int flags, const char
   ssize_t result;
 
   VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-  VLOG_INFO("%s: fd: [%u] msg->msg_iovlen: [%d] caller: [%s]...", __FUNCTION__, fd, msg->msg_iovlen, caller);
+  VLOG_INFO("%s: fd: [%u] msg->msg_iovlen: [%lu] caller: [%s]...", __FUNCTION__, fd, msg->msg_iovlen, caller);
   dbg_sock_dump_msghdr(msg);
   VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 
   result = sendmsg(fd, msg, flags);
 
+  return result;
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
+ssize_t dbg_sock_recv(int fd, void *buf, size_t size, int flags, const char* caller)
+{
+  ssize_t result;
+
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+  VLOG_INFO("%s: fd: [%u] caller: [%s]...", __FUNCTION__, fd, caller);
+  LogBuffer((char*)caller, buf, size);
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+  result = recv(fd, buf, size, flags);
+
+  return result;
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
+ssize_t dbg_sock_recvmsg(int fd, struct msghdr *message, int flags, const char* caller)
+{
+  ssize_t result;
+
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+  VLOG_INFO("%s: fd: [%u] caller: [%s]...", __FUNCTION__, fd, caller);
+  //LogBuffer((char*)caller, buf, size);
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+  result = recvmsg(fd, message, flags);
+
+  return result;
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
+ssize_t dbg_sock_recvfrom(int fd, void *__restrict buf, size_t size, int flags, __SOCKADDR_ARG addr,
+                         socklen_t *__restrict addr_len, const char* caller)
+{
+  ssize_t result;
+
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+  VLOG_INFO("%s: fd: [%u] caller: [%s]...", __FUNCTION__, fd, caller);
+  LogBuffer((char*)caller, buf, size);
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+  result = recvfrom(fd, buf, size, flags, addr, addr_len);
+  
+  return result;
+}
+
+//==================================================================================================================
+//
+//==================================================================================================================
+int dbg_sock_recvmmsg (int fd, struct mmsghdr *vmessages, unsigned int vlen, int flags, struct timespec *tmo, const char* caller)
+{
+  int result;
+
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+  VLOG_INFO("%s: fd: [%u] caller: [%s]...", __FUNCTION__, fd, caller);
+  //LogBuffer((char*)caller, buf, size);
+  VLOG_INFO("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+  result = recvmmsg (fd, vmessages, vlen, flags, tmo);
+  
   return result;
 }
 

@@ -78,6 +78,7 @@
 #include "unaligned.h"
 #include "openvswitch/vlog.h"
 #include "util.h"
+#include "debug.h"
 
 VLOG_DEFINE_THIS_MODULE(netdev_linux);
 
@@ -1202,7 +1203,7 @@ netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
     msgh.msg_flags = 0;
 
     do {
-        retval = recvmsg(fd, &msgh, MSG_TRUNC);
+        retval = SOCK_RECVMSG(fd, &msgh, MSG_TRUNC);
     } while (retval < 0 && errno == EINTR);
 
     if (retval < 0) {

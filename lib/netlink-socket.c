@@ -727,7 +727,7 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, int *nsid, bool wait, c
             }
         }
 #else
-        retval = recvmsg(sock->fd, &msg, wait ? 0 : MSG_DONTWAIT);
+        retval = SOCK_RECVMSG(sock->fd, &msg, wait ? 0 : MSG_DONTWAIT);
 #endif
         error = (retval < 0 ? errno
                  : retval == 0 ? ECONNRESET /* not possible? */

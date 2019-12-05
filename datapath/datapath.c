@@ -208,7 +208,7 @@ static struct vport *new_vport(const struct vport_parms *parms)
 {
 	struct vport *vport;
 
-	vport = ovs_vport_add(parms);
+	vport = ovs_vport_add(parms, __FUNCTION__);
 	if (!IS_ERR(vport)) {
 		struct datapath *dp = parms->dp;
 		struct hlist_head *head = vport_hash_bucket(dp, vport->port_no);
@@ -2478,7 +2478,7 @@ static int __init dp_init(void)
 
 	BUILD_BUG_ON(sizeof(struct ovs_skb_cb) > FIELD_SIZEOF(struct sk_buff, cb));
 
-	pr_info("Open vSwitch switching datapath %s\n", VERSION);
+	pr_info("rolaya_check 2: Open vSwitch switching datapath %s\n", VERSION);
 
 	ovs_nsh_init();
 	err = action_fifos_init();
