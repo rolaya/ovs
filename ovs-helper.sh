@@ -24,9 +24,14 @@ number_of_vms=$number_of_interfaces
 # VM base name. The VMs names are something like "vm-debian9-net-node1"
 vm_base_name="vm-debian9-net-node"
 
-# This determines if we are going to use DHCP or static IP addresses
-# Change to True to use DHCP.
-use_dhcp="False"
+# This determines if we are going to use DHCP or static IP address for the host.
+# Node: the guests can use either (but are configured for static ip).
+use_dhcp="True"
+
+# Traffic shaping specific definitions
+
+# Max rate: 1GB/sec (network specific)
+ether_max_rate=1000000000
 
 #==================================================================================================================
 #
@@ -79,6 +84,8 @@ ovs_show_menu()
   echo "\"ovs_vm_set_qos_netem_packet_loss\"  - Configure packet loss as a percentage (netem) on specified port"
   echo "                                      ex: ovs_vm_set_qos_netem_packet_loss tap_port3 10"
   echo "\"ovs_purge_network\"                 - Purge deployed network (and QoS)"
+  echo "\"ovs_port_set_max_rate\"             - Apply (max rate) traffic shaping to virtual port"
+  
   echo
   echo "Project build/install related commands"
   echo "=========================================================================================================================="
@@ -483,6 +490,52 @@ ovs_vm_set_qos_netem_packet_loss()
 }
 
 #==================================================================================================================
+#
+#==================================================================================================================
+ovs_port_set_max_rate()
+{
+  local command=""
+  local interface=$1
+  local port_max_rate=$2
+  local queue_name=""
+
+  # Configure traffic shaping for interfaces (to be) used by VM1 and VM2.
+  # The max bandwidth allowed for VM1 will be 10Mbits/sec,
+  # the max bandwidth allowed for VM2 will be 20Mbits/sec.
+  # VM3 is used as the baseline, so no traffic shaping is applied to
+  # this VM.
+
+  # Insure port and max rate supplied (and max rate is a number)
+  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
+
+    # For clarity and simplicity set some ovs-vsctl parameters
+    queue_name="${interface}_queue"
+
+    # rolaya: parameterize
+    command="sudo ovs-vsctl -- \
+    set interface $interface ofport_request=7 -- \
+    set port $wired_iface qos=@newqos -- \
+    --id=@newqos create qos type=linux-htb \
+        other-config:max-rate=$ether_max_rate \
+        queues:122=@$queue_name -- \
+    --id=@$queue_name create queue other-config:max-rate=$port_max_rate"
+    echo "excuting: [$command]"
+    $command
+    
+    # rolaya: parameterize
+    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
+    echo "excuting: [$command]"
+    $command
+
+    #echo "Traffic shaping port [$interface] configuration:"
+    #echo "Max port rate: [$port_max_rate]"
+
+  else
+    echo "Usage: ovs_port_set_qos port max-rate (e.g. ovs_port_set_qos tap_port1 10000)..."
+  fi
+}
+
+#==================================================================================================================
 # 
 #==================================================================================================================
 ovs_bridge_del_ports()
@@ -644,7 +697,7 @@ vm_start()
   local vm_name=${1:-"vm_name_is_required"}
 
   # Start VM
-  command="VBoxManage startvm $vm_name"
+  command="VBoxManage startvm $vm_name --type headless"
   echo "Executing: [$command]"
   $command
 }
