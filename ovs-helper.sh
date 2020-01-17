@@ -9,6 +9,21 @@ wired_iface_ip=192.168.1.206
 # The name of the OVS bridge to create
 ovs_bridge=br0
 
+# The number of VMs (and interfaces we are going to configure)
+number_of_interfaces=3
+
+# Degfault port name
+port_name="tap_port"
+
+# VirtualBox looks at this as the network name
+network_name=$port_name
+
+# For clarity, use number of VMs variable (it is the same as the number of ports/interfaces)
+number_of_vms=$number_of_interfaces
+
+# VM base name. The VMs names are something like "vm-debian9-net-node1"
+vm_base_name="vm-debian9-net-node"
+
 #==================================================================================================================
 #
 #==================================================================================================================
@@ -22,12 +37,31 @@ ovs_show_menu()
   echo "Manually update these values in this file according to your network configuration"
   echo
   echo
+  
+  # Environment provisioning
+  echo "Provisioning commands"
+  echo "\"ovs_provision_for_build\"           - Provision system for building ovs"
+  
   # Display some helpers to the user
   echo "Main commands"
   echo "=========================================================================================================================="
   echo "\"ovs_show_menu\"                     - Displays this menu"
   echo "\"ovs_start_test\"                    - Starts OVS daemons, deploys network configuration and configures QoS"
   echo "\"ovs_stop_test\"                     - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
+  echo "\"vms_start\"                         - Start all VMs in the testbed"
+  echo
+
+  echo "\"ovs_bridge_add\"                    - Add bridge to system"
+  echo "\"ovs_bridge_add_ports\"              - Add ports to bridge"
+  echo "\"ovs_bridge_del\"                    - Delete bridge to system"
+  echo "\"ovs_bridge_del_ports\"              - Delete ports from bridge"
+
+  # Hypervisor commands
+  echo "Hypervisor commands"
+  echo "=========================================================================================================================="
+  echo "\"vm_set_network_interface\"          - Set VM's NIC \"network\" (this is an existing port in an OVS bridge)"
+  echo "\"vm_network_configure\"              - Configure network"
+
   echo
   echo "Network deployment and QoS configuration commands"
   echo "=========================================================================================================================="
@@ -118,15 +152,24 @@ ovs_bridge_add_port()
 {
   local port="$1"
   local bridge="$2"
+  local command=""
+
+  echo "Adding port: [$port] to bridge: [$bridge]"
 
   # Create tap (layer 2) device/interface
-  ip tuntap add mode tap $port
+  command="ip tuntap add mode tap $port"
+  echo "Executing: [$command]"
+  $command
 
   # Activate device/interface 
-  ip link set $port up
+  command="ip link set $port up"
+  echo "Executing: [$command]"
+  $command
 
   # Add tap device/interface to "br0" bridge
-  ovs-vsctl add-port $bridge $port
+  command="ovs-vsctl add-port $bridge $port"
+  echo "Executing: [$command]"
+  $command
   
   echo "Added tap port/interface: [$port] to ovs bridge: [$bridge]"
 }
@@ -138,16 +181,25 @@ ovs_bridge_del_port()
 {
   local port="$1"
   local bridge="$2"
+  local command=""
+
+  echo "Deleting port: [$port] from bridge: [$bridge]"
 
   # Delete tap device/interface to "br0" bridge
-  ovs-vsctl del-port $bridge $port
-  
-  # Delete tap port
-  ip tuntap del mode tap $port
+  command="ovs-vsctl del-port $bridge $port"
+  echo "Executing: [$command]"
+  $command
 
   # Deactivate device/interface 
-  ip link set $port down
-  
+  command="ip link set $port down"
+  echo "Executing: [$command]"
+  $command
+
+  # Delete tap port
+  command="ip tuntap del mode tap $port"
+  echo "Executing: [$command]"
+  $command
+
   echo "Deleted tap port/interface: [$port] from ovs bridge: [$bridge]"
 }
 
@@ -173,6 +225,43 @@ ovs_stop()
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   ovs-ctl stop
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_bridge_add_ports()
+{
+  local bridge=$1
+  local port=${2:-$port_name}
+  
+  echo "Adding ports to bridge $bridge..."
+
+  # Create a tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
+  for ((i = 1; i <= $number_of_interfaces; i++)) do
+    ovs_bridge_add_port $port$i $bridge
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_bridge_add()
+{
+  local bridge=$1
+  local command=""
+
+  # These commands are executed as "root" user (for now)
+  
+  echo "Adding bridge $bridge to system..."
+
+  # Update path with ovs scripts path.
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+
+  # create new bridge named "br0"
+  command="ovs-vsctl add-br $bridge"
+  echo "executing: [$command]..."
+  $command
 }
 
 #==================================================================================================================
@@ -211,14 +300,8 @@ ovs_deploy_network()
   # Acquire ip address and assign it to the "br0" bridge/interface
   dhclient $ovs_bridge
 
-  # Create a tap interface for VM1 (and add interface to "br0" bridge).
-  ovs_bridge_add_port tap_port1 $ovs_bridge
-
-  # Create a tap interface for VM2 (and add interface to "br0" bridge).
-  ovs_bridge_add_port tap_port2 $ovs_bridge
-
-  # Create a tap interface for VM3 (and add interface to "br0" bridge).
-  ovs_bridge_add_port tap_port3 $ovs_bridge
+  # Create tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
+  ovs_bridge_add_ports $ovs_bridge
 }
 
 #==================================================================================================================
@@ -226,15 +309,18 @@ ovs_deploy_network()
 #==================================================================================================================
 ovs_purge_network_deployment()
 {
+  local port=${2:-$port_name}
+
   # Update path with ovs scripts path.
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # "Manually" delete port/interfaces and bridge created via "ovs_deploy_network"
   # Note: it is possible to purge all bridge, etc configuration when starting
   # daemons via command line options (need to try this...).
-  ovs-vsctl del-port tap_port1
-  ovs-vsctl del-port tap_port2
-  ovs-vsctl del-port tap_port3
+  for ((i = 1; i <= $number_of_interfaces; i++)) do
+    ovs-vsctl del-port $port$1
+  done
+  
   ovs-vsctl del-br $ovs_bridge
 }
 
@@ -259,6 +345,8 @@ ovs_run_test()
 #==================================================================================================================
 ovs_test_tc()
 {
+  local port=${2:-$port_name}
+
   # These commands are executed as "root" user (for now)
 
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
@@ -268,7 +356,7 @@ ovs_test_tc()
   ovs-vsctl add-br $ovs_bridge
 
   # tap port for VM1
-  ovs_bridge_add_port tap_port1 $ovs_bridge
+  ovs_bridge_add_port $port1 $ovs_bridge
 }
 
 #==================================================================================================================
@@ -386,6 +474,26 @@ ovs_vm_set_qos_netem_packet_loss()
 #==================================================================================================================
 # 
 #==================================================================================================================
+ovs_bridge_del_ports()
+{
+  local bridge=$1
+  local port=${2:-$port_name}
+
+  # These commands are executed as "root" user (for now)
+  
+  echo "Purging $number_of_interfaces ports from $bridge bridge..."
+
+  for ((i = $number_of_interfaces; i > 0; i--)) do
+
+    # Delete tap port tap_portx from ovs bridge
+    ovs_bridge_del_port $port$i $bridge
+
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 ovs_purge_network()
 {
   # These commands are executed as "root" user (for now)
@@ -395,15 +503,9 @@ ovs_purge_network()
   # Update path with ovs scripts path.
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
-  # Delete tap port tap_port3 from ovs bridge
-  ovs_bridge_del_port tap_port3 $ovs_bridge
+  # Remote ports from bridge
+  ovs_bridge_del_ports $ovs_bridge
 
-  # Delete tap port tap_port2 from ovs bridge
-  ovs_bridge_del_port tap_port2 $ovs_bridge
-  
-  # Delete tap port tap_port1 from ovs bridge
-  ovs_bridge_del_port tap_port1 $ovs_bridge
-  
   # Delete physical wired port from ovs bridge
   ovs-vsctl del-port $ovs_bridge $wired_iface
   
@@ -464,6 +566,92 @@ ovs_install()
   make
   sudo make install
   sudo make modules_install
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_provision_for_build()
+{
+  local command=""
+  local linux_version=$(uname -r)
+
+  command="sudo apt-get install git build-essential libtool autoconf pkg-config"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo apt-get install libssl-dev gdb libcap-ng-dev linux-headers-$linux_version"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# rolaya: this function needs parameter handling improvements.
+#==================================================================================================================
+vm_set_network_interface()
+{
+  local command=""
+  local vm_name=${1:-"vm_name_is_required"}
+  local nic_number=${2:-"1"}
+  local network=${3:-"net_name_is_required"}
+
+  # Format the command to set the network interface to bridged and the bridged 
+  # adapter to an appropriate "network" name (i.e. a port defined with OVS).
+  # The command generated will be something like: 
+  # "VBoxManage modifyvm vm-debian9-net-node1 --nic1 bridged --bridgeadapter1 tap_port1"
+  command="VBoxManage modifyvm $vm_name --nic$nic_number bridged --bridgeadapter$nic_number $network"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vm_network_configure()
+{
+  # For now, we assume the first nic interface
+  local nic="1"
+
+  echo "Setting NIC \"network\" configuration for all VMs in the network..."
+
+  for ((i = 1; i <= $number_of_vms; i++)) do
+
+    # Set VM network configuration
+    vm_set_network_interface $vm_base_name$i "1" $network_name$i
+
+  done
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+vm_start()
+{
+  local command=""
+  local vm_name=${1:-"vm_name_is_required"}
+
+  # Start VM
+  command="VBoxManage startvm $vm_name"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vms_start()
+{
+  # For now, we assume the first nic interface
+  local nic="1"
+
+  echo "Launching all VMs in the network..."
+
+  for ((i = 1; i <= $number_of_vms; i++)) do
+
+    # Start VM
+    vm_start $vm_base_name$i
+
+  done
 }
 
 # Display ovs helper "menu"
