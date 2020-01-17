@@ -24,6 +24,10 @@ number_of_vms=$number_of_interfaces
 # VM base name. The VMs names are something like "vm-debian9-net-node1"
 vm_base_name="vm-debian9-net-node"
 
+# This determines if we are going to use DHCP or static IP addresses
+# Change to True to use DHCP.
+use_dhcp="False"
+
 #==================================================================================================================
 #
 #==================================================================================================================
@@ -49,6 +53,8 @@ ovs_show_menu()
   echo "\"ovs_start_test\"                    - Starts OVS daemons, deploys network configuration and configures QoS"
   echo "\"ovs_stop_test\"                     - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
   echo "\"vms_start\"                         - Start all VMs in the testbed"
+  echo "\"vms_stop\"                          - Stop all VMs in the testbed"
+
   echo
 
   echo "\"ovs_bridge_add\"                    - Add bridge to system"
@@ -297,8 +303,11 @@ ovs_deploy_network()
   # deploying ovs).
   ip addr del $wired_iface_ip/24 dev $wired_iface
 
-  # Acquire ip address and assign it to the "br0" bridge/interface
-  dhclient $ovs_bridge
+  # Using DHCP?
+  if [[ "$use_dhcp" = "True" ]]; then
+    # Acquire ip address and assign it to the "br0" bridge/interface
+    dhclient $ovs_bridge
+  fi
 
   # Create tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
   ovs_bridge_add_ports $ovs_bridge
@@ -337,7 +346,9 @@ ovs_run_test()
   
   ovs-ctl start
 
-  dhclient $ovs_bridge
+  if [[ "$use_dhcp" = "True" ]]; then
+    dhclient $ovs_bridge
+  fi
 }
 
 #==================================================================================================================
@@ -518,8 +529,10 @@ ovs_purge_network()
   # Bring up physical wired interface
   ip link set $wired_iface up
 
-  # Acquire ip address and assign it to the physical wired interface
-  dhclient $wired_iface
+  if [[ "$use_dhcp" = "True" ]]; then
+    # Acquire ip address and assign it to the physical wired interface
+    dhclient $wired_iface
+  fi
 }
 
 #==================================================================================================================
@@ -637,6 +650,20 @@ vm_start()
 }
 
 #==================================================================================================================
+#
+#==================================================================================================================
+vm_stop()
+{
+  local command=""
+  local vm_name=${1:-"vm_name_is_required"}
+
+  # Start VM
+  command="VBoxManage controlvm $vm_name acpipowerbutton"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
 # 
 #==================================================================================================================
 vms_start()
@@ -650,6 +677,24 @@ vms_start()
 
     # Start VM
     vm_start $vm_base_name$i
+
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vms_stop()
+{
+  # For now, we assume the first nic interface
+  local nic="1"
+
+  echo "Powering off all VMs in the network..."
+
+  for ((i = 1; i <= $number_of_vms; i++)) do
+
+    # Power off VM
+    vm_stop $vm_base_name$i
 
   done
 }
