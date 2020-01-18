@@ -71,27 +71,27 @@ ovs_show_menu()
   echo "Hypervisor commands"
   echo "=========================================================================================================================="
   echo "\"vm_set_network_interface\"          - Set VM's NIC \"network\" (this is an existing port in an OVS bridge)"
-  echo "\"vm_network_configure\"              - Configure network"
+  echo "\"vms_set_network_interface\"         - Set all VM's NIC \"network\" interface"
 
   echo
   echo "Network deployment and QoS configuration commands"
   echo "=========================================================================================================================="
-  echo "\"ovs_deploy_network\"                - Deploys network configuration"
-  echo "\"ovs_set_qos\"                       - Configures QoS"
-  echo "\"ovs_vm_set_qos\"                    - Configures QoS for specific vm3 (vm attached to tap_port3)"
-  echo "\"ovs_vm_set_qos_netem_latency\"      - Configure latency (netem) on specified port"
-  echo "                                      ex: ovs_vm_set_qos_netem_latency tap_port3 2000000"
-  echo "\"ovs_vm_set_qos_netem_packet_loss\"  - Configure packet loss as a percentage (netem) on specified port"
-  echo "                                      ex: ovs_vm_set_qos_netem_packet_loss tap_port3 10"
-  echo "\"ovs_purge_network\"                 - Purge deployed network (and QoS)"
-  echo "\"ovs_port_set_max_rate\"             - Apply (max rate) traffic shaping to virtual port"
+  echo "\"ovs_deploy_network\"                   - Deploys network configuration"
+  echo "\"ovs_set_qos\"                          - Configures QoS"
+  echo "\"ovs_vm_set_qos\"                       - Configures QoS for specific vm3 (vm attached to tap_port3)"
+  echo "\"ovs_port_qos_set_netem_latency\"       - Configure latency (netem) on specified port"
+  echo "                                         ex: ovs_port_qos_set_netem_latency tap_port3 2000000"
+  echo "\"ovs_port_qos_set_netem_packet_loss\"   - Configure packet loss as a percentage (netem) on specified port"
+  echo "                                         ex: ovs_port_qos_set_netem_packet_loss tap_port3 10"
+  echo "\"ovs_port_qos_set_max_rate\"            - Configure max rate on specified port"
+  echo "\"ovs_purge_network\"                    - Purge deployed network (and QoS)"
   
   echo
   echo "Project build/install related commands"
   echo "=========================================================================================================================="
-  echo "\"ovs_install\"                       - Builds and installs OVS daemons and kernel modules"
-  echo "\"ovs_configure_debug_build\"         - Configures OVS project for debug build"
-  echo "\"ovs_configure_release_build\"       - Configures OVS project for release build"
+  echo "\"ovs_install\"                          - Builds and installs OVS daemons and kernel modules"
+  echo "\"ovs_configure_debug_build\"            - Configures OVS project for debug build"
+  echo "\"ovs_configure_release_build\"          - Configures OVS project for release build"
 }
 
 #==================================================================================================================
@@ -170,17 +170,17 @@ ovs_bridge_add_port()
   echo "Adding port: [$port] to bridge: [$bridge]"
 
   # Create tap (layer 2) device/interface
-  command="ip tuntap add mode tap $port"
+  command="sudo ip tuntap add mode tap $port"
   echo "Executing: [$command]"
   $command
 
   # Activate device/interface 
-  command="ip link set $port up"
+  command="sudo ip link set $port up"
   echo "Executing: [$command]"
   $command
 
   # Add tap device/interface to "br0" bridge
-  command="ovs-vsctl add-port $bridge $port"
+  command="sudo ovs-vsctl add-port $bridge $port"
   echo "Executing: [$command]"
   $command
   
@@ -199,17 +199,17 @@ ovs_bridge_del_port()
   echo "Deleting port: [$port] from bridge: [$bridge]"
 
   # Delete tap device/interface to "br0" bridge
-  command="ovs-vsctl del-port $bridge $port"
+  command="sudo ovs-vsctl del-port $bridge $port"
   echo "Executing: [$command]"
   $command
 
   # Deactivate device/interface 
-  command="ip link set $port down"
+  command="sudo ip link set $port down"
   echo "Executing: [$command]"
   $command
 
   # Delete tap port
-  command="ip tuntap del mode tap $port"
+  command="sudo ip tuntap del mode tap $port"
   echo "Executing: [$command]"
   $command
 
@@ -272,7 +272,27 @@ ovs_bridge_add()
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # create new bridge named "br0"
-  command="ovs-vsctl add-br $bridge"
+  command="sudo ovs-vsctl add-br $bridge"
+  echo "executing: [$command]..."
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_start()
+{
+  local command=""
+
+  # These commands are executed as "root" user (for now)
+  
+  echo "Starting Open vSwitch..."
+
+  # Update path with ovs scripts path.
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+
+  # Starts "ovs-vswitchd:" and "ovsdb-server" daemons
+  command="ovs-ctl start --delete-bridges"
   echo "executing: [$command]..."
   $command
 }
@@ -282,42 +302,50 @@ ovs_bridge_add()
 #==================================================================================================================
 ovs_deploy_network()
 {
+  local command=""
+
   # These commands are executed as "root" user (for now)
   
   echo "Deploying testbed network..."
 
-  # Update path with ovs scripts path.
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-
-  # Starts "ovs-vswitchd:" and "ovsdb-server" daemons
-  ovs-ctl start --delete-bridges
-
   # create new bridge named "br0"
-  ovs-vsctl add-br $ovs_bridge
+  command="sudo ovs-vsctl add-br $ovs_bridge"
+  echo "executing: [$command]..."
+  $command
   
   # Activate "br0" device 
-  ip link set $ovs_bridge up
+  command="sudo ip link set $ovs_bridge up"
+  echo "executing: [$command]..."
+  $command
 
   # Add network device "enp5s0" to "br0" bridge. Device "enp5s0" is the
   # name of the actual physical wired network interface. In some devices
   # it may be eth0.
-  ovs-vsctl add-port $ovs_bridge $wired_iface
+  command="sudo ovs-vsctl add-port $ovs_bridge $wired_iface"
+  echo "executing: [$command]..."
+  $command
   
   # Delete assigned ip address from "enp5s0" device/interface. This address 
   # was provided (served) by the DHCP server (in the local network).
   # For simplicity, I configured my verizon router to always assign this
   # ip address (192.168.1.206) to "this" host (i.e. the host where I am 
   # deploying ovs).
-  ip addr del $wired_iface_ip/24 dev $wired_iface
+  command="sudo ip addr del $wired_iface_ip/24 dev $wired_iface"
+  echo "executing: [$command]..."
+  $command
 
   # Using DHCP?
   if [[ "$use_dhcp" = "True" ]]; then
     # Acquire ip address and assign it to the "br0" bridge/interface
-    dhclient $ovs_bridge
+    command="sudo dhclient $ovs_bridge"
+    echo "executing: [$command]..."
+    $command
   fi
 
   # Create tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
-  ovs_bridge_add_ports $ovs_bridge
+  command="ovs_bridge_add_ports $ovs_bridge"
+  echo "executing: [$command]..."
+  $command
 }
 
 #==================================================================================================================
@@ -334,10 +362,10 @@ ovs_purge_network_deployment()
   # Note: it is possible to purge all bridge, etc configuration when starting
   # daemons via command line options (need to try this...).
   for ((i = 1; i <= $number_of_interfaces; i++)) do
-    ovs-vsctl del-port $port$1
+    sudo ovs-vsctl del-port $port$1
   done
   
-  ovs-vsctl del-br $ovs_bridge
+  sudo ovs-vsctl del-br $ovs_bridge
 }
 
 #==================================================================================================================
@@ -371,7 +399,7 @@ ovs_test_tc()
 
   ovs-ctl start
 
-  ovs-vsctl add-br $ovs_bridge
+  sudo ovs-vsctl add-br $ovs_bridge
 
   # tap port for VM1
   ovs_bridge_add_port $port1 $ovs_bridge
@@ -446,58 +474,97 @@ ovs_vm_set_qos()
 #==================================================================================================================
 #
 #==================================================================================================================
-ovs_vm_set_qos_netem_latency()
+ovs_port_qos_set_netem_latency()
 {
-  local tap_port=$1
+  local command=""
+  local qos_type=""
+  local queue_name=""
+  local interface=$1
   local latency=$2
 
   # Configure (netem latency) traffic shaping on interface.
   
-  echo "Setting latency: [$latency] in port: [$tap_port]"
-  
-  ovs-vsctl -- \
-  set interface $tap_port ofport_request=7 -- \
-  set port $wired_iface qos=@qos_netem_latency -- \
-  --id=@qos_netem_latency create qos type=linux-netem \
-      other-config:latency=$latency \
-      queues:122=@$tap_port_queue -- \
-  --id=@$tap_port_queue create queue other-config:latency=$latency
+  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-  ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal
+    # For clarity and simplicity set some ovs-vsctl parameters
+    queue_name="${interface}_queue"
+    qos_type="linux-netem"
+
+    command="sudo ovs-vsctl -- \
+    set interface $interface ofport_request=7 -- \
+    set port $wired_iface qos=@qos_netem_latency -- \
+    --id=@qos_netem_latency create qos type=$qos_type \
+        other-config:latency=$latency \
+        queues:122=@$queue_name -- \
+    --id=@$queue_name create queue other-config:latency=$latency"
+    echo "excuting: [$command]"
+    $command
+
+    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
+    echo "excuting: [$command]"
+    $command
+
+    echo "Applied QoS configuration:"
+    echo "bridge:         [$ovs_bridge]"
+    echo "port:           [$wired_iface]"
+    echo "interface:      [$interface]"
+    echo "type:           [$qos_type]"
+    echo "latency (us):   [$latency]"
+
+  else
+    echo "Usage: ovs_port_qos_set_netem_packet_loss port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
+  fi
 }
 
 #==================================================================================================================
 #
 #==================================================================================================================
-ovs_vm_set_qos_netem_packet_loss()
+ovs_port_qos_set_netem_packet_loss()
 {
-  local tap_port=$1
+  local command=""
+  local queue_name=""
+  local interface=$1
   local packet_loss=$2
 
   # Configure (netem packet loss) traffic shaping on interface.
-  
-  echo "Setting packet loss: [$packet_loss%] in port: [$tap_port]"
-  
-  ovs-vsctl -- \
-  set interface $tap_port ofport_request=7 -- \
-  set port $wired_iface qos=@qos_netem_pkt_loss -- \
-  --id=@qos_netem_pkt_loss create qos type=linux-netem \
-      other-config:loss=$packet_loss \
-      queues:122=@$tap_port_queue -- \
-  --id=@$tap_port_queue create queue other-config:loss=$packet_loss
 
-  ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal
+  # Insure port and max rate supplied (and max rate is a number)
+  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
+
+    # For clarity and simplicity set some ovs-vsctl parameters
+    queue_name="${interface}_queue"
+  
+    command="sudo ovs-vsctl -- \
+    set interface $interface ofport_request=7 -- \
+    set port $wired_iface qos=@qos_netem_pkt_loss -- \
+    --id=@qos_netem_pkt_loss create qos type=linux-netem \
+        other-config:loss=$packet_loss \
+        queues:122=@$queue_name -- \
+    --id=@$queue_name create queue other-config:loss=$packet_loss"
+    echo "excuting: [$command]"
+    $command
+
+    command="ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
+    echo "excuting: [$command]"
+    $command    
+
+    echo "Configured packet loss to: [$packet_loss%] in port: [$tap_port]"
+
+  else
+    echo "Usage: ovs_port_qos_set_netem_packet_loss port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
+  fi
 }
 
 #==================================================================================================================
 #
 #==================================================================================================================
-ovs_port_set_max_rate()
+ovs_port_qos_set_max_rate()
 {
   local command=""
+  local queue_name=""
+  local qos_type=""
   local interface=$1
   local port_max_rate=$2
-  local queue_name=""
 
   # Configure traffic shaping for interfaces (to be) used by VM1 and VM2.
   # The max bandwidth allowed for VM1 will be 10Mbits/sec,
@@ -510,12 +577,13 @@ ovs_port_set_max_rate()
 
     # For clarity and simplicity set some ovs-vsctl parameters
     queue_name="${interface}_queue"
+    qos_type="linux-htb"
 
     # rolaya: parameterize
     command="sudo ovs-vsctl -- \
     set interface $interface ofport_request=7 -- \
     set port $wired_iface qos=@newqos -- \
-    --id=@newqos create qos type=linux-htb \
+    --id=@newqos create qos type=$qos_type \
         other-config:max-rate=$ether_max_rate \
         queues:122=@$queue_name -- \
     --id=@$queue_name create queue other-config:max-rate=$port_max_rate"
@@ -527,11 +595,16 @@ ovs_port_set_max_rate()
     echo "excuting: [$command]"
     $command
 
-    #echo "Traffic shaping port [$interface] configuration:"
-    #echo "Max port rate: [$port_max_rate]"
+    echo "Applied QoS configuration:"
+    echo "bridge:         [$ovs_bridge]"
+    echo "port:           [$wired_iface]"
+    echo "interface:      [$interface]"
+    echo "type:           [$qos_type]"
+    echo "ether max rate: [$ether_max_rate]"
+    echo "port max rate:  [$port_max_rate]"
 
   else
-    echo "Usage: ovs_port_set_qos port max-rate (e.g. ovs_port_set_qos tap_port1 10000)..."
+    echo "Usage: ovs_port_qos_set_qos port max-rate (e.g. ovs_port_qos_set_qos tap_port1 10000)..."
   fi
 }
 
@@ -571,13 +644,13 @@ ovs_purge_network()
   ovs_bridge_del_ports $ovs_bridge
 
   # Delete physical wired port from ovs bridge
-  ovs-vsctl del-port $ovs_bridge $wired_iface
+  sudo ovs-vsctl del-port $ovs_bridge $wired_iface
   
   # Deactivate "br0" device 
   ip link set $ovs_bridge down
   
   # Delete bridge named "br0" from ovs
-  ovs-vsctl del-br $ovs_bridge
+  sudo ovs-vsctl del-br $ovs_bridge
 
   # Bring up physical wired interface
   ip link set $wired_iface up
@@ -673,7 +746,7 @@ vm_set_network_interface()
 #==================================================================================================================
 # 
 #==================================================================================================================
-vm_network_configure()
+vms_set_network_interface()
 {
   # For now, we assume the first nic interface
   local nic="1"
@@ -686,6 +759,16 @@ vm_network_configure()
     vm_set_network_interface $vm_base_name$i "1" $network_name$i
 
   done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+deploy_network()
+{
+  ovs_deploy_network
+  vms_set_network_interface
+  vms_start
 }
 
 #==================================================================================================================
