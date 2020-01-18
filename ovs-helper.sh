@@ -558,6 +558,26 @@ ovs_port_qos_set_netem_packet_loss()
 #==================================================================================================================
 #
 #==================================================================================================================
+qos_id_format() 
+{
+  local temp=""
+  local interface=$2
+  local qos_type=$3
+  local qos_other_config=$4
+
+  # Generate a "unique" qos id, something like:
+  # "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
+  temp="qos_id"
+  temp+="_$wired_iface"
+  temp+="_$interface"
+  temp+="_$qos_type"
+  temp+="_$qos_other_config"
+  eval "$1=$temp"
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
 ovs_port_qos_set_max_rate()
 {
   local command=""
@@ -565,12 +585,10 @@ ovs_port_qos_set_max_rate()
   local qos_type=""
   local interface=$1
   local port_max_rate=$2
+  local qos_id=""
+  local qos_other_config=""
 
-  # Configure traffic shaping for interfaces (to be) used by VM1 and VM2.
-  # The max bandwidth allowed for VM1 will be 10Mbits/sec,
-  # the max bandwidth allowed for VM2 will be 20Mbits/sec.
-  # VM3 is used as the baseline, so no traffic shaping is applied to
-  # this VM.
+  # Configure max rate QoS.
 
   # Insure port and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
@@ -578,15 +596,20 @@ ovs_port_qos_set_max_rate()
     # For clarity and simplicity set some ovs-vsctl parameters
     queue_name="${interface}_queue"
     qos_type="linux-htb"
+    qos_other_config="max-rate"
+    
+    # Make the qos_id as unique as possible (contains port, interface qos type and other qos config),
+    # something like "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
+    qos_id_format qos_id $interface $qos_type $qos_other_config
 
     # rolaya: parameterize
     command="sudo ovs-vsctl -- \
     set interface $interface ofport_request=7 -- \
-    set port $wired_iface qos=@newqos -- \
-    --id=@newqos create qos type=$qos_type \
-        other-config:max-rate=$ether_max_rate \
+    set port $wired_iface qos=@$qos_id -- \
+    --id=@$qos_id create qos type=$qos_type \
+        other-config:$qos_other_config=$ether_max_rate \
         queues:122=@$queue_name -- \
-    --id=@$queue_name create queue other-config:max-rate=$port_max_rate"
+    --id=@$queue_name create queue other-config:$qos_other_config=$port_max_rate"
     echo "excuting: [$command]"
     $command
     
@@ -600,8 +623,10 @@ ovs_port_qos_set_max_rate()
     echo "port:           [$wired_iface]"
     echo "interface:      [$interface]"
     echo "type:           [$qos_type]"
+    echo "config:         [$qos_other_config]"
     echo "ether max rate: [$ether_max_rate]"
     echo "port max rate:  [$port_max_rate]"
+    echo "qos id:         [$qos_id]"
 
   else
     echo "Usage: ovs_port_qos_set_qos port max-rate (e.g. ovs_port_qos_set_qos tap_port1 10000)..."
