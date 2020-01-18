@@ -18,6 +18,8 @@ int dbg_sock_recvmmsg (int fd, struct mmsghdr *vmessages, unsigned int vlen, int
 void Bin2Hex(char *dest, int sizeof_dest, const uint8_t *src, int len, uint32_t PrintFlags);
 void LogBuffer(char *Message, const uint8_t* pData, int DataSize);
 
+#ifdef DEBUG_SOCKET_IO
+
 /* Misc. socket related macros (used for debugging purposes) */
 #define SOCK_SEND(fd, buf, size, flags) dbg_sock_send(fd, buf, size, flags, __FUNCTION__)
 #define SOCK_SENDMSG(fd, msg, flags) dbg_sock_sendmsg(fd, msg, flags, __FUNCTION__)
@@ -26,3 +28,16 @@ void LogBuffer(char *Message, const uint8_t* pData, int DataSize);
 #define SOCK_RECVMSG(fd, message, flags) dbg_sock_recvmsg(fd, message, flags, __FUNCTION__)
 #define SOCK_RECVFROM(fd, buf, size, flags, addr, addr_len) dbg_sock_recvfrom(fd, buf, size, flags, addr, addr_len, __FUNCTION__)
 #define SOCK_RECVMMSG(fd, vmessages, vlen, flags, tmo) dbg_sock_recvmmsg(fd, vmessages, vlen, flags, tmo, __FUNCTION__)
+
+#else
+
+/* Misc. socket related macros (used for debugging purposes) */
+#define SOCK_SEND(fd, buf, size, flags) send(fd, buf, size, flags)
+#define SOCK_SENDMSG(fd, msg, flags) sendmsg(fd, msg, flags)
+
+#define SOCK_RECV(fd, buf, size, flags) recv(fd, buf, size, flags)
+#define SOCK_RECVMSG(fd, message, flags) recvmsg(fd, message, flags)
+#define SOCK_RECVFROM(fd, buf, size, flags, addr, addr_len) recvfrom(fd, buf, size, flags, addr, addr_len)
+#define SOCK_RECVMMSG(fd, vmessages, vlen, flags, tmo) recvmmsg(fd, vmessages, vlen, flags, tmo)
+
+#endif
