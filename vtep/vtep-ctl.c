@@ -2518,5 +2518,5 @@ vtep_ctl_cmd_init(void)
 {
     ctl_init(&vteprec_idl_class, vteprec_table_classes, tables,
              cmd_show_tables, vtep_ctl_exit);
-    ctl_register_commands(vtep_commands);
+    ctl_register_commands(vtep_commands, __FUNCTION__);
 }

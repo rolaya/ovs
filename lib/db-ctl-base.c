@@ -1792,6 +1792,18 @@ pre_cmd_destroy(struct ctl_context *ctx)
 }
 
 static void
+pre_cmd_purge(struct ctl_context *ctx)
+{
+    const char *table_name = ctx->argv[1];
+
+    ctx->error = pre_get_table(ctx, table_name, NULL);
+    if (ctx->error) {
+        return;
+    }
+}
+
+//rolaya: 
+static void
 cmd_destroy(struct ctl_context *ctx)
 {
     bool must_exist = !shash_find(&ctx->options, "--if-exists");
@@ -1841,6 +1853,34 @@ cmd_destroy(struct ctl_context *ctx)
             }
         }
     }
+    invalidate_cache(ctx);
+}
+
+static void
+cmd_purge(struct ctl_context *ctx)
+{
+    const char *table_name = ctx->argv[1];
+    const struct ovsdb_idl_table_class *table;
+
+    printf("purging table: [%s]\n", table_name);
+    
+    ctx->error = get_table(table_name, &table);
+    if (ctx->error) {
+        return;
+    }
+
+    const struct ovsdb_idl_row *row;
+    const struct ovsdb_idl_row *next_row;
+
+    for (row = ovsdb_idl_first_row(ctx->idl, table); row;) {
+        next_row = ovsdb_idl_next_row(row);
+    
+        printf("deleting record: "UUID_FMT"\n", UUID_ARGS(&row->uuid));
+
+        ovsdb_idl_txn_delete(row);
+        row = next_row;
+    }
+
     invalidate_cache(ctx);
 }
 
@@ -2468,6 +2508,8 @@ static const struct ctl_command_syntax db_ctl_commands[] = {
      cmd_create, post_create, "--id=", RW},
     {"destroy", 1, INT_MAX, "TABLE [RECORD]...", pre_cmd_destroy, cmd_destroy,
      NULL, "--if-exists,--all", RW},
+    {"purge", 1, INT_MAX, "TABLE", pre_cmd_purge, cmd_purge,
+     NULL, "", RW},     
     {"wait-until", 2, INT_MAX, "TABLE RECORD [COLUMN[:KEY]=VALUE]...",
      pre_cmd_wait_until, cmd_wait_until, NULL, "", RO},
     {NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, RO},
@@ -2483,11 +2525,12 @@ ctl_register_command(const struct ctl_command_syntax *command)
  * 'all_commands'.  The last element of 'commands' must be an all-NULL
  * element. */
 void
-ctl_register_commands(const struct ctl_command_syntax *commands)
+ctl_register_commands(const struct ctl_command_syntax *commands, const char* caller)
 {
     const struct ctl_command_syntax *p;
 
     for (p = commands; p->name; p++) {
+        //printf("%s(): caller: [%s] registering command: [%s]\n", __FUNCTION__, caller, p->name);
         ctl_register_command(p);
     }
 }
@@ -2504,7 +2547,7 @@ ctl_init__(const struct ovsdb_idl_class *idl_class_,
     ctl_classes = ctl_classes_;
     n_classes = idl_class->n_tables;
     ctl_exit_func = ctl_exit_func_;
-    ctl_register_commands(db_ctl_commands);
+    ctl_register_commands(db_ctl_commands, __FUNCTION__);
 
     cmd_show_tables = cmd_show_tables_;
     if (cmd_show_tables) {
@@ -2519,17 +2562,18 @@ const char *
 ctl_get_db_cmd_usage(void)
 {
     return "Database commands:\n\
-  list TBL [REC]              list RECord (or all records) in TBL\n\
-  find TBL CONDITION...       list records satisfying CONDITION in TBL\n\
-  get TBL REC COL[:KEY]       print values of COLumns in RECord in TBL\n\
-  set TBL REC COL[:KEY]=VALUE set COLumn values in RECord in TBL\n\
-  add TBL REC COL [KEY=]VALUE add (KEY=)VALUE to COLumn in RECord in TBL\n\
-  remove TBL REC COL [KEY=]VALUE  remove (KEY=)VALUE from COLumn\n\
-  clear TBL REC COL           clear values from COLumn in RECord in TBL\n\
-  create TBL COL[:KEY]=VALUE  create and initialize new record\n\
-  destroy TBL REC             delete RECord from TBL\n\
+  list TBL [REC]                        list RECord (or all records) in TBL\n\
+  find TBL CONDITION...                 list records satisfying CONDITION in TBL\n\
+  get TBL REC COL[:KEY]                 print values of COLumns in RECord in TBL\n\
+  set TBL REC COL[:KEY]=VALUE           set COLumn values in RECord in TBL\n\
+  add TBL REC COL [KEY=]VALUE           add (KEY=)VALUE to COLumn in RECord in TBL\n\
+  remove TBL REC COL [KEY=]VALUE        remove (KEY=)VALUE from COLumn\n\
+  clear TBL REC COL                     clear values from COLumn in RECord in TBL\n\
+  create TBL COL[:KEY]=VALUE            create and initialize new record\n\
+  destroy TBL REC                       delete RECord from TBL\n\
+  purge TBL                             purge all records from table TBL\n\
   wait-until TBL REC [COL[:KEY]=VALUE]  wait until condition is true\n\
-Potentially unsafe database commands require --force option.\n";
+                                        Potentially unsafe database commands require --force option.\n";
 }
 
 const char *

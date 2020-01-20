@@ -154,6 +154,8 @@ main(int argc, char *argv[])
     unsigned int seqno;
     size_t n_commands;
 
+    // rolaya: this is the entry point for the "ovs-vsctl" daemon.
+
     set_program_name(argv[0]);
     fatal_ignore_sigpipe();
     vlog_set_levels(NULL, VLF_CONSOLE, VLL_WARN);
@@ -3121,5 +3123,5 @@ vsctl_cmd_init(void)
 {
     ctl_init(&ovsrec_idl_class, ovsrec_table_classes, tables, cmd_show_tables,
              vsctl_exit);
-    ctl_register_commands(vsctl_commands);
+    ctl_register_commands(vsctl_commands, __FUNCTION__);
 }
