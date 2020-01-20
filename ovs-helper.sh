@@ -6,13 +6,14 @@ wired_iface=enp5s0
 # The IP address assigned (by the DHCP server) to the physical wired interface (host specific)
 wired_iface_ip=192.168.1.206
 
-# The name of the OVS bridge to create
+# The name of the OVS bridge to create (it can be anything)
 ovs_bridge=br0
 
 # The number of VMs (and interfaces we are going to configure)
 number_of_interfaces=3
 
-# Degfault port name
+# Default port name. Once generated, you will have something like:
+# tap_port1, tap_port2, ... (depends on "number_of_interfaces").
 port_name="tap_port"
 
 # VirtualBox looks at this as the network name
@@ -21,7 +22,10 @@ network_name=$port_name
 # For clarity, use number of VMs variable (it is the same as the number of ports/interfaces)
 number_of_vms=$number_of_interfaces
 
-# VM base name. The VMs names are something like "vm-debian9-net-node1"
+# VM base name. The VMs names are something like "vm-debian9-net-node1".
+# At presend, these VMs are "manually" generated. The "vm_base_name" must be manually changed
+# here according to your local configuration (i.e. based on how the VMs in the testbed were
+# named. It is assumed VMs are sequentially named).
 vm_base_name="vm-debian9-net-node"
 
 # This determines if we are going to use DHCP or static IP address for the host.
@@ -38,15 +42,30 @@ ether_max_rate=1000000000
 #==================================================================================================================
 ovs_show_menu()
 {
+  local port_name_sample=""
+  local vm_name_sample=""
+
+  # Initialize misc. for display to user
+  port_name_sample=$port_name
+  port_name_sample+="1"
+
+  vm_name_sample=$vm_base_name
+  vm_name_sample+="1"
+
   # Display current hardcoded configuration 
   echo
   echo "Current configuration (currently hardcoded)"
+  echo "Manually update these values in this file according to your network configuration"
   echo "Wired interface:            [$wired_iface]"
   echo "Wired interface IP address: [$wired_iface_ip]"
-  echo "Manually update these values in this file according to your network configuration"
+  echo "Default bridge name:        [$ovs_bridge]"
+  echo "Number of VMs in testbed:   [$number_of_vms]"
+  echo "Expected VM base name:      [$vm_name_sample]. VM names will be sequential starting with [$vm_name_sample]"
+  echo "VM base port name:          [$port_name]. Port names will be sequential starting with [$port_name_sample]"
+
   echo
   echo
-  
+
   # Environment provisioning
   echo "Provisioning commands"
   echo "\"ovs_provision_for_build\"           - Provision system for building ovs"
@@ -55,6 +74,10 @@ ovs_show_menu()
   echo "Main commands"
   echo "=========================================================================================================================="
   echo "\"ovs_show_menu\"                     - Displays this menu"
+  echo "\"ovs_start\"                         - Starts OVS daemons"
+  echo "\"ovs_stop\"                          - Stops OVS daemons"
+  echo "\"ovs_restart\"                       - Restarts OVS daemons"
+
   echo "\"ovs_start_test\"                    - Starts OVS daemons, deploys network configuration and configures QoS"
   echo "\"ovs_stop_test\"                     - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
   echo "\"vms_start\"                         - Start all VMs in the testbed"
@@ -219,30 +242,6 @@ ovs_bridge_del_port()
 #==================================================================================================================
 # 
 #==================================================================================================================
-ovs_start()
-{
-  # These commands are executed as "root" user (for now)
-  
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-  
-  ovs-ctl start
-}
-
-#==================================================================================================================
-#
-#==================================================================================================================
-ovs_stop()
-{
-  # These commands are executed as "root" user (for now)
-
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-
-  ovs-ctl stop
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
 ovs_bridge_add_ports()
 {
   local bridge=$1
@@ -284,17 +283,43 @@ ovs_start()
 {
   local command=""
 
-  # These commands are executed as "root" user (for now)
-  
   echo "Starting Open vSwitch..."
 
   # Update path with ovs scripts path.
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # Starts "ovs-vswitchd:" and "ovsdb-server" daemons
-  command="ovs-ctl start --delete-bridges"
+  # This command must be executed as "root" user (for now).
+  command="ovs-ctl start"
   echo "executing: [$command]..."
   $command
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_stop()
+{
+  # These commands are executed as "root" user (for now)
+
+  export PATH=$PATH:/usr/local/share/openvswitch/scripts
+
+  ovs-ctl stop
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_restart()
+{
+  # Right now (until I figure out a way to maybe clear a cache (if any), etc), we need to do this after any 
+  # updates to QoS. For example, after a "QoS" record is created and we want to update its max-rate, we only
+  # need to do something like:
+  # "sudo ovs-vsctl set QoS bdc3fe06-edcc-419b-80bd-d523a0628aa2 other_config:max-rate=30000000" where 
+  # "bdc3fe06-edcc-419b-80bd-d523a0628aa2" is the QoS record entry (generated by the framework when the
+  # record was first created (see "ovs_port_qos_set_max_rate")).
+  ovs_stop
+  ovs_start
 }
 
 #==================================================================================================================
@@ -422,12 +447,14 @@ ovs_set_qos()
 #==================================================================================================================
 ovs_traffic_shape()
 {
+  local command=""
+
   # Configure traffic shaping for interfaces (to be) used by VM1 and VM2.
   # The max bandwidth allowed for VM1 will be 10Mbits/sec,
   # the max bandwidth allowed for VM2 will be 20Mbits/sec.
   # VM3 is used as the baseline, so no traffic shaping is applied to
   # this VM.
-  ovs-vsctl -- \
+  command="sudo ovs-vsctl -- \
   set interface tap_port1 ofport_request=5 -- \
   set interface tap_port2 ofport_request=6 -- \
   set port $wired_iface qos=@newqos -- \
@@ -436,7 +463,9 @@ ovs_traffic_shape()
       queues:123=@tap_port1_queue \
       queues:234=@tap_port2_queue -- \
   --id=@tap_port1_queue create queue other-config:max-rate=10000000 -- \
-  --id=@tap_port2_queue create queue other-config:max-rate=20000000
+  --id=@tap_port2_queue create queue other-config:max-rate=20000000"
+  echo "excuting: [$command]"
+  $command  
 }
 
 #==================================================================================================================
@@ -444,10 +473,17 @@ ovs_traffic_shape()
 #==================================================================================================================
 ovs_configure_traffic_flows()
 {
+  local command=""
+
   # Use OpenFlow to direct packets from tap_port1, tap_port2 to their respective 
   # (traffic shaping) queues (reserved for them in "ovs_traffic_shape").
-  ovs-ofctl add-flow $ovs_bridge in_port=5,actions=set_queue:123,normal
-  ovs-ofctl add-flow $ovs_bridge in_port=6,actions=set_queue:234,normal
+  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=5,actions=set_queue:123,normal"
+  echo "excuting: [$command]"
+  $command
+
+  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=6,actions=set_queue:234,normal"
+  echo "excuting: [$command]"
+  $command
 }
 
 #==================================================================================================================
@@ -455,20 +491,26 @@ ovs_configure_traffic_flows()
 #==================================================================================================================
 ovs_vm_set_qos()
 {
+  local command=""
+
   # Configure traffic shaping for interfaces (to be) used by VM1 and VM2.
   # The max bandwidth allowed for VM1 will be 10Mbits/sec,
   # the max bandwidth allowed for VM2 will be 20Mbits/sec.
   # VM3 is used as the baseline, so no traffic shaping is applied to
   # this VM.
-  ovs-vsctl -- \
+  command="sudo ovs-vsctl -- \
   set interface tap_port3 ofport_request=7 -- \
-  set port $wired_iface qos=@newqos -- \
-  --id=@newqos create qos type=linux-htb \
+  set port $wired_iface qos=@newqos1 -- \
+  --id=@newqos1 create qos type=linux-htb \
       other-config:max-rate=1000000000 \
       queues:122=@tap_port3_queue -- \
-  --id=@tap_port3_queue create queue other-config:max-rate=10000
+  --id=@tap_port3_queue create queue other-config:max-rate=30000000"
+  echo "excuting: [$command]"
+  $command
   
-  ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal
+  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
+  echo "excuting: [$command]"
+  $command  
 }
 
 #==================================================================================================================
@@ -548,7 +590,15 @@ ovs_port_qos_set_netem_packet_loss()
     echo "excuting: [$command]"
     $command    
 
-    echo "Configured packet loss to: [$packet_loss%] in port: [$tap_port]"
+    echo "Applied QoS configuration:"
+    echo "bridge:         [$ovs_bridge]"
+    echo "port:           [$wired_iface]"
+    echo "interface:      [$interface]"
+    echo "type:           [$qos_type]"
+    echo "config:         [$qos_other_config]"
+    echo "ether max rate: [$ether_max_rate]"
+    #echo "port max rate:  [$port_max_rate]"
+    echo "qos id:         [$qos_id]"
 
   else
     echo "Usage: ovs_port_qos_set_netem_packet_loss port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
@@ -565,8 +615,10 @@ qos_id_format()
   local qos_type=$3
   local qos_other_config=$4
 
-  # Generate a "unique" qos id, something like:
-  # "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
+  # Generate a somewhat unique and readable qos id, something like:
+  # "qos_id_enp5s0_tap_port1_linux-htb_max-rate". Ultimately the QoS table
+  # record is identified by the record's uuid (something like:
+  # bdc3fe06-edcc-419b-80bd-d523a0628aa2).
   temp="qos_id"
   temp+="_$wired_iface"
   temp+="_$interface"
@@ -576,7 +628,7 @@ qos_id_format()
 }
 
 #==================================================================================================================
-#
+# Set linux-htb max-rate QoS. At present this creates a new record ("QoS" table) everytime it is executed.
 #==================================================================================================================
 ovs_port_qos_set_max_rate()
 {
@@ -587,6 +639,8 @@ ovs_port_qos_set_max_rate()
   local port_max_rate=$2
   local qos_id=""
   local qos_other_config=""
+  local of_port_request=""
+  local queue_number=""
 
   # Configure max rate QoS.
 
@@ -602,31 +656,37 @@ ovs_port_qos_set_max_rate()
     # something like "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
     qos_id_format qos_id $interface $qos_type $qos_other_config
 
-    # rolaya: parameterize
+    # We use the number part of the interface as the openflow port request and openflow queue number
+    of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
+    queue_number=$(echo "$interface" | sed 's/[^0-9]*//g')
+
+    # Format and execute traffic shaping command (creates and initializes new record in QoS table)
     command="sudo ovs-vsctl -- \
-    set interface $interface ofport_request=7 -- \
+    set interface $interface ofport_request=$of_port_request -- \
     set port $wired_iface qos=@$qos_id -- \
     --id=@$qos_id create qos type=$qos_type \
         other-config:$qos_other_config=$ether_max_rate \
-        queues:122=@$queue_name -- \
+        queues:$queue_number=@$queue_name -- \
     --id=@$queue_name create queue other-config:$qos_other_config=$port_max_rate"
     echo "excuting: [$command]"
     $command
     
-    # rolaya: parameterize
-    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
+    # Format and execute flow command (creates and initializes new record in Queue table)
+    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
     echo "excuting: [$command]"
     $command
 
     echo "Applied QoS configuration:"
-    echo "bridge:         [$ovs_bridge]"
-    echo "port:           [$wired_iface]"
-    echo "interface:      [$interface]"
-    echo "type:           [$qos_type]"
-    echo "config:         [$qos_other_config]"
-    echo "ether max rate: [$ether_max_rate]"
-    echo "port max rate:  [$port_max_rate]"
-    echo "qos id:         [$qos_id]"
+    echo "bridge:          [$ovs_bridge]"
+    echo "port:            [$wired_iface]"
+    echo "interface:       [$interface]"
+    echo "type:            [$qos_type]"
+    echo "config:          [$qos_other_config]"
+    echo "ether max rate:  [$ether_max_rate]"
+    echo "port max rate:   [$port_max_rate]"
+    echo "qos id:          [$qos_id]"
+    echo "of port request: [$of_port_request]"
+    echo "of queue number: [$queue_number]"
 
   else
     echo "Usage: ovs_port_qos_set_qos port max-rate (e.g. ovs_port_qos_set_qos tap_port1 10000)..."
@@ -858,6 +918,42 @@ vms_stop()
     vm_stop $vm_base_name$i
 
   done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_dump_ports()
+{
+  local command=""
+
+  command="sudo ovs-ofctl dump-ports br0"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_dump_flows()
+{
+  local command=""
+
+  command="sudo ovs-ofctl dump-flows br0"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_dump_tables()
+{
+  local command=""
+
+  command="sudo ovs-ofctl dump-tables br0"
+  echo "Executing: [$command]"
+  $command
 }
 
 # Display ovs helper "menu"
