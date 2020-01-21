@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# Define text views
+TEXT_VIEW_NORMAL_BLUE="\e[01;34m"
+TEXT_VIEW_NORMAL_RED="\e[31m"
+TEXT_VIEW_NORMAL_GREEN="\e[32m"
+TEXT_VIEW_NORMAL_PURPLE="\e[177m"
+TEXT_VIEW_NORMAL='\e[00m'
+
 # The name of the physical wired interface (host specific)
 wired_iface=enp5s0
 
@@ -10,7 +17,7 @@ wired_iface_ip=192.168.1.206
 ovs_bridge=br0
 
 # The number of VMs (and interfaces we are going to configure)
-number_of_interfaces=3
+number_of_interfaces=1
 
 # Default port name. Once generated, you will have something like:
 # tap_port1, tap_port2, ... (depends on "number_of_interfaces").
@@ -36,6 +43,9 @@ use_dhcp="True"
 
 # Max rate: 1GB/sec (network specific)
 ether_max_rate=1000000000
+
+# Array of openvswitch tables (incomplete)
+declare -a ovs_tables_array=("Open_vSwitch" "Interface" "Bridge" "Port" "QoS" "Queue" "Flow_Table" "sFlow" "NetFlow" "Datapath")
 
 #==================================================================================================================
 #
@@ -394,43 +404,6 @@ ovs_purge_network_deployment()
   done
   
   sudo ovs-vsctl del-br $ovs_bridge
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-ovs_run_test()
-{
-  # These commands are executed as "root" user (for now)
-  
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-
-  ip addr del $wired_iface_ip/24 dev $wired_iface
-  
-  ovs-ctl start
-
-  if [[ "$use_dhcp" = "True" ]]; then
-    dhclient $ovs_bridge
-  fi
-}
-
-#==================================================================================================================
-#
-#==================================================================================================================
-ovs_test_tc()
-{
-  local port=${2:-$port_name}
-
-  # These commands are executed as "root" user (for now)
-
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-
-  ovs-ctl start
-
-  sudo ovs-vsctl add-br $ovs_bridge
-
-  # tap port for VM1
-  ovs_bridge_add_port $port1 $ovs_bridge
 }
 
 #==================================================================================================================
@@ -861,6 +834,8 @@ ovs_bridge_del_ports()
 #==================================================================================================================
 ovs_purge_network()
 {
+  local command=""
+
   # These commands are executed as "root" user (for now)
   
   echo "Purging testbed network..."
@@ -869,23 +844,35 @@ ovs_purge_network()
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # Remote ports from bridge
-  ovs_bridge_del_ports $ovs_bridge
+  command="ovs_bridge_del_ports $ovs_bridge"
+  echo "Executing: [$command]"
+  $command
 
   # Delete physical wired port from ovs bridge
-  sudo ovs-vsctl del-port $ovs_bridge $wired_iface
-  
+  command="sudo ovs-vsctl del-port $ovs_bridge $wired_iface"
+  echo "Executing: [$command]"
+  $command
+
   # Deactivate "br0" device 
-  ip link set $ovs_bridge down
-  
+  command="sudo ip link set $ovs_bridge down"
+  echo "Executing: [$command]"
+  $command
+
   # Delete bridge named "br0" from ovs
-  sudo ovs-vsctl del-br $ovs_bridge
+  command="sudo ovs-vsctl del-br $ovs_bridge"
+  echo "Executing: [$command]"
+  $command
 
   # Bring up physical wired interface
-  ip link set $wired_iface up
+  command="sudo ip link set $wired_iface up"
+  echo "Executing: [$command]"
+  $command
 
   if [[ "$use_dhcp" = "True" ]]; then
     # Acquire ip address and assign it to the physical wired interface
-    dhclient $wired_iface
+    command="sudo dhclient $wired_iface"
+    echo "Executing: [$command]"
+    $command    
   fi
 }
 
@@ -987,6 +974,33 @@ vms_set_network_interface()
     vm_set_network_interface $vm_base_name$i "1" $network_name$i
 
   done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vm_deploy()
+{
+  local vm_number=$1
+  local vm_name=""
+  local port=""
+  
+  # Configure the vm name and the port name the vm will use.
+  local vm_name="$vm_base_name$vm_number"
+  local port="$network_name$vm_number"
+
+  echo "Attaching VM: [$vm_name] to bridge: [$ovs_bridge], port: [$port]..."
+
+  # Add port to bridge
+  ovs_bridge_add_port $port $ovs_bridge
+
+  # "Attach" VM's network interface to bridge ports
+  vm_set_network_interface $vm_name "1" $port
+  
+  echo "Starting VM: [$vm_name]..."
+
+  # Start all VMs in the testbed
+  vm_start $vm_name
 }
 
 #==================================================================================================================
@@ -1127,6 +1141,56 @@ ovs_dump_tables()
   command="sudo ovs-ofctl dump-tables br0"
   echo "Executing: [$command]"
   $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_list_table()
+{
+  local table=$1
+  local command=""
+
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}Displaying table: ${TEXT_VIEW_NORMAL}${TEXT_VIEW_NORMAL_BLUE}[$table]${TEXT_VIEW_NORMAL}"
+
+  command="sudo ovs-vsctl list $table"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_list_tables()
+{
+  local arraylength=0
+
+  arraylength=${#ovs_tables_array[@]}
+
+  # Loop through all tables (hardcoded) defined in ovs tables array.
+  for (( i=1; i<${arraylength}+1; i++ ));
+    do
+      # Display all records in current table (e.g. qos table)
+      ovs_list_table ${ovs_tables_array[$i-1]}
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_tables_list()
+{
+  local arraylength=0
+
+  echo "Note: this is a partial list of Open vSwitch tables. For a complete list do \"sudo ovs-vsctl --help\""
+
+  arraylength=${#ovs_tables_array[@]}
+
+  # Loop through all tables (hardcoded) defined in ovs tables array.
+  for (( i=1; i<${arraylength}+1; i++ ));
+    do
+      echo ${ovs_tables_array[$i-1]}
+  done
 }
 
 # Display ovs helper "menu"
