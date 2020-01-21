@@ -102,12 +102,14 @@ ovs_show_menu()
   echo "\"ovs_deploy_network\"                   - Deploys network configuration"
   echo "\"ovs_set_qos\"                          - Configures QoS"
   echo "\"ovs_vm_set_qos\"                       - Configures QoS for specific vm3 (vm attached to tap_port3)"
-  echo "\"ovs_port_qos_set_netem_latency\"       - Configure latency (netem) on specified port"
-  echo "                                         ex: ovs_port_qos_set_netem_latency tap_port3 2000000"
-  echo "\"ovs_port_qos_set_netem_packet_loss\"   - Configure packet loss as a percentage (netem) on specified port"
-  echo "                                         ex: ovs_port_qos_set_netem_packet_loss tap_port3 10"
-  echo "\"ovs_port_qos_max_rate_create\"         - Create QoS record (max rate) on specified port"
-  echo "\"ovs_port_qos_max_rate_update\"         - Update QoS record (max rate) on specified port"
+  echo "\"ovs_port_qos_latency_create\"          - Create QoS record - latency (netem) on specified port"
+  echo "                                         ex: ovs_port_qos_latency_create tap_port3 2000000"
+  echo "\"ovs_port_qos_packet_loss_create\"      - Create QoS record - packet loss as a percentage (netem) on specified port"
+  echo "                                         ex: ovs_port_qos_packet_loss_create tap_port3 10"
+  echo "\"ovs_port_qos_max_rate_create\"         - Create QoS record - max rate on specified port"
+  echo "\"ovs_port_qos_max_rate_update\"         - Update QoS record - max rate on specified port"
+  echo "\"ovs_port_qos_packet_loss_update\"      - Update QoS record - packet loss on specified port"
+  echo "\"ovs_port_qos_latency_update\"          - Update QoS record - latency on specified port"
   
   echo "\"ovs_purge_network\"                    - Purge deployed network (and QoS)"
   
@@ -517,98 +519,6 @@ ovs_vm_set_qos()
 #==================================================================================================================
 #
 #==================================================================================================================
-ovs_port_qos_set_netem_latency()
-{
-  local command=""
-  local qos_type=""
-  local queue_name=""
-  local interface=$1
-  local latency=$2
-
-  # Configure (netem latency) traffic shaping on interface.
-  
-  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
-
-    # For clarity and simplicity set some ovs-vsctl parameters
-    queue_name="${interface}_queue"
-    qos_type="linux-netem"
-
-    command="sudo ovs-vsctl -- \
-    set interface $interface ofport_request=7 -- \
-    set port $wired_iface qos=@qos_netem_latency -- \
-    --id=@qos_netem_latency create qos type=$qos_type \
-        other-config:latency=$latency \
-        queues:122=@$queue_name -- \
-    --id=@$queue_name create queue other-config:latency=$latency"
-    echo "excuting: [$command]"
-    $command
-
-    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
-    echo "excuting: [$command]"
-    $command
-
-    echo "Applied QoS configuration:"
-    echo "bridge:         [$ovs_bridge]"
-    echo "port:           [$wired_iface]"
-    echo "interface:      [$interface]"
-    echo "type:           [$qos_type]"
-    echo "latency (us):   [$latency]"
-
-  else
-    echo "Usage: ovs_port_qos_set_netem_packet_loss port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
-  fi
-}
-
-#==================================================================================================================
-#
-#==================================================================================================================
-ovs_port_qos_set_netem_packet_loss()
-{
-  local command=""
-  local queue_name=""
-  local interface=$1
-  local packet_loss=$2
-
-  # Configure (netem packet loss) traffic shaping on interface.
-
-  # Insure port and max rate supplied (and max rate is a number)
-  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
-
-    # For clarity and simplicity set some ovs-vsctl parameters
-    queue_name="${interface}_queue"
-  
-    command="sudo ovs-vsctl -- \
-    set interface $interface ofport_request=7 -- \
-    set port $wired_iface qos=@qos_netem_pkt_loss -- \
-    --id=@qos_netem_pkt_loss create qos type=linux-netem \
-        other-config:loss=$packet_loss \
-        queues:122=@$queue_name -- \
-    --id=@$queue_name create queue other-config:loss=$packet_loss"
-    echo "excuting: [$command]"
-    $command
-
-    command="ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
-    echo "excuting: [$command]"
-    $command    
-
-    echo "Applied QoS configuration:"
-    echo "bridge:         [$ovs_bridge]"
-    echo "port:           [$wired_iface]"
-    echo "interface:      [$interface]"
-    echo "type:           [$qos_type]"
-    echo "config:         [$qos_other_config]"
-    echo "ether max rate: [$ether_max_rate]"
-    #echo "port max rate:  [$port_max_rate]"
-    echo "qos id:         [$qos_id]"
-
-  else
-    echo "Usage: ovs_port_qos_set_netem_packet_loss port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
-  fi
-}
-
-#==================================================================================================================
-#
-#==================================================================================================================
 qos_id_format() 
 {
   local temp=""
@@ -626,6 +536,140 @@ qos_id_format()
   temp+="_$qos_type"
   temp+="_$qos_other_config"
   eval "$1=$temp"
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_port_qos_latency_create()
+{
+  local command=""
+  local queue_name=""
+  local qos_type=""
+  local interface=$1
+  local latency=$2
+  local qos_id=""
+  local qos_other_config=""
+  local of_port_request=""
+  local queue_number=""
+  local qos_uuid=""
+  local queue_uuid=""
+  local uuids=""
+
+  # Configure (netem latency) traffic shaping on interface.
+  
+  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
+
+    # For clarity and simplicity set some ovs-vsctl parameters
+    queue_name="${interface}_queue"
+    qos_type="linux-netem"
+    qos_other_config="latency"
+    
+    # Make the qos_id as unique as possible (contains port, interface qos type and other qos config),
+    # something like "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
+    qos_id_format qos_id $interface $qos_type $qos_other_config
+
+    # We use the number part of the interface as the openflow port request and openflow queue number
+    of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
+    queue_number=$(echo "$interface" | sed 's/[^0-9]*//g')
+
+    command="sudo ovs-vsctl -- \
+    set interface $interface ofport_request=$of_port_request -- \
+    set port $wired_iface qos=@$qos_id -- \
+    --id=@$qos_id create qos type=$qos_type \
+        other-config:$qos_other_config=$latency \
+        queues:$queue_number=@$queue_name -- \
+    --id=@$queue_name create queue other-config:$qos_other_config=$latency"
+    echo "excuting: [$command]"
+    $command
+
+    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
+    echo "excuting: [$command]"
+    $command
+
+    echo "Created QoS configuration:"
+    echo "bridge:            [$ovs_bridge]"
+    echo "port:              [$wired_iface]"
+    echo "interface:         [$interface]"
+    echo "type:              [$qos_type]"
+    echo "config:            [$qos_other_config]"
+    echo "latency:           [$latency]"
+    echo "qos id:            [$qos_id]"
+    echo "of port request:   [$of_port_request]"
+    echo "of queue number:   [$queue_number]"
+    echo "UUIDs:             [$uuids] (second one is Queue record)"
+
+  else
+    echo "Usage: ovs_port_qos_packet_loss_create port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
+  fi
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_port_qos_packet_loss_create()
+{
+  local command=""
+  local queue_name=""
+  local qos_type=""
+  local interface=$1
+  local packet_loss=$2
+  local qos_id=""
+  local qos_other_config=""
+  local of_port_request=""
+  local queue_number=""
+  local qos_uuid=""
+  local queue_uuid=""
+  local uuids=""
+
+  # Configure (netem packet loss) traffic shaping on interface.
+
+  # Insure port and max rate supplied (and max rate is a number)
+  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
+
+    # For clarity and simplicity set some ovs-vsctl parameters
+    queue_name="${interface}_queue"
+    qos_type="linux-netem"
+    qos_other_config="loss"
+    
+    # Make the qos_id as unique as possible (contains port, interface qos type and other qos config),
+    # something like "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
+    qos_id_format qos_id $interface $qos_type $qos_other_config
+
+    # We use the number part of the interface as the openflow port request and openflow queue number
+    of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
+    queue_number=$(echo "$interface" | sed 's/[^0-9]*//g')
+  
+    command="sudo ovs-vsctl -- \
+    set interface $interface ofport_request=$of_port_request -- \
+    set port $wired_iface qos=@$qos_id -- \
+    --id=@$qos_id create qos type=$qos_type \
+        other-config:loss=$packet_loss \
+        queues:$queue_number=@$queue_name -- \
+    --id=@$queue_name create queue other-config:$qos_other_config=$packet_loss"
+    echo "excuting: [$command]"
+    $command
+
+    # Format and execute flow command (creates and initializes new record in Queue table)
+    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
+    echo "excuting: [$command]"
+    $command
+
+    echo "Created QoS configuration:"
+    echo "bridge:            [$ovs_bridge]"
+    echo "port:              [$wired_iface]"
+    echo "interface:         [$interface]"
+    echo "type:              [$qos_type]"
+    echo "config:            [$qos_other_config]"
+    echo "packet loss:       [$packet_loss]"
+    echo "qos id:            [$qos_id]"
+    echo "of port request:   [$of_port_request]"
+    echo "of queue number:   [$queue_number]"
+    echo "UUIDs:             [$uuids] (second one is Queue record)"
+
+  else
+    echo "Usage: ovs_port_qos_packet_loss_create port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
+  fi
 }
 
 #==================================================================================================================
@@ -694,11 +738,80 @@ ovs_port_qos_max_rate_create()
     echo "of port request:   [$of_port_request]"
     echo "of queue number:   [$queue_number]"
     echo "UUIDs:             [$uuids] (second one is Queue record)"
-    #echo "QoS record uuid:   [$qos_uuid]"
-    #echo "Queue record uuid: [$queue_uuid]"
 
   else
     echo "Usage: ovs_port_qos_set_qos port max-rate (e.g. ovs_port_qos_set_qos tap_port1 10000)..."
+  fi
+}
+
+#==================================================================================================================
+# Updates QoS.
+#==================================================================================================================
+ovs_port_qos_update()
+{
+  local command=""
+  local uuid=$1
+  local other_config=$2
+  local other_config_val=$3
+
+  # Update QoS max rate.
+
+  # Insure uuid and max rate supplied (and max rate is a number)
+  if [[ $# -eq 3 ]] && [[ $3 -gt 1 ]]; then
+
+    # Format and execute traffic shaping command (creates and initializes new record in QoS table)
+    command="sudo ovs-vsctl set Queue $uuid other_config:$other_config=$other_config_val"
+    echo "excuting: [$command]"
+    $command
+
+    echo "Update QoS configuration:"
+    echo "UUID:  [$uuid]"
+    echo "QoS:   [$other_config:$other_config_val]"
+
+  else
+    echo "Usage: ovs_port_qos_update uuid max-rate max-rate-value (e.g. \"ovs_port_qos_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 max-rate 30000000\")"
+  fi
+}
+
+#==================================================================================================================
+# Updates QoS - netem latency.
+#==================================================================================================================
+ovs_port_qos_latency_update()
+{
+  local uuid=$1
+  local latency=$2
+  local other_config="latency"
+
+  # Update QoS max rate.
+
+  # Insure uuid and max rate supplied (and max rate is a number)
+  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
+
+    ovs_port_qos_update $uuid $other_config $latency
+
+  else
+    echo "Usage: ovs_port_qos_latency_update uuid latency (e.g. \"ovs_port_qos_latency_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 1000000\")..."
+  fi
+}
+
+#==================================================================================================================
+# Updates QoS - netem packet loss.
+#==================================================================================================================
+ovs_port_qos_packet_loss_update()
+{
+  local uuid=$1
+  local packet_loss=$2
+  local other_config="loss"
+
+  # Update QoS max rate.
+
+  # Insure uuid and max rate supplied (and max rate is a number)
+  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
+
+    ovs_port_qos_update $uuid $other_config $packet_loss
+
+  else
+    echo "Usage: ovs_port_qos_packet_loss_update uuid loss (e.g. \"ovs_port_qos_packet_loss_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 30\")..."
   fi
 }
 
@@ -707,26 +820,19 @@ ovs_port_qos_max_rate_create()
 #==================================================================================================================
 ovs_port_qos_max_rate_update()
 {
-  local command=""
   local uuid=$1
   local port_max_rate=$2
+  local other_config="max-rate"
 
   # Update QoS max rate.
 
   # Insure uuid and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-    # Format and execute traffic shaping command (creates and initializes new record in QoS table)
-    command="sudo ovs-vsctl set Queue $uuid other_config:max-rate=$port_max_rate"
-    echo "excuting: [$command]"
-    uuids="$($command)"
-
-    echo "Update QoS configuration:"
-    echo "UUID:              [$uuid]"
-    echo "ether max rate:    [$port_max_rate]"
+    ovs_port_qos_update $uuid $other_config $port_max_rate
 
   else
-    echo "Usage: ovs_port_qos_max_rate_update uuid max-rate (e.g. sudo ovs-vsctl set Queue bdc3fe06-edcc-419b-80bd-d523a0628aa2 other_config:max-rate=30000000)..."
+    echo "Usage: ovs_port_qos_max_rate_update uuid max-rate (e.g. \"ovs_port_qos_max_rate_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 30000000\")..."
   fi
 }
 
