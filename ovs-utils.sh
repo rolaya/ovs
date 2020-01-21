@@ -720,7 +720,7 @@ ovs_port_qos_max_rate_create()
 #==================================================================================================================
 # Updates QoS.
 #==================================================================================================================
-ovs_port_qos_update()
+ovs_port_queue_update()
 {
   local command=""
   local uuid=$1
@@ -742,7 +742,7 @@ ovs_port_qos_update()
     echo "QoS:   [$other_config:$other_config_val]"
 
   else
-    echo "Usage: ovs_port_qos_update uuid max-rate max-rate-value (e.g. \"ovs_port_qos_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 max-rate 30000000\")"
+    echo "Usage: ovs_port_queue_update uuid max-rate max-rate-value (e.g. \"ovs_port_queue_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 max-rate 30000000\")"
   fi
 }
 
@@ -760,7 +760,7 @@ ovs_port_qos_latency_update()
   # Insure uuid and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-    ovs_port_qos_update $uuid $other_config $latency
+    ovs_port_queue_update $uuid $other_config $latency
 
   else
     echo "Usage: ovs_port_qos_latency_update uuid latency (e.g. \"ovs_port_qos_latency_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 1000000\")..."
@@ -781,7 +781,7 @@ ovs_port_qos_packet_loss_update()
   # Insure uuid and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-    ovs_port_qos_update $uuid $other_config $packet_loss
+    ovs_port_queue_update $uuid $other_config $packet_loss
 
   else
     echo "Usage: ovs_port_qos_packet_loss_update uuid loss (e.g. \"ovs_port_qos_packet_loss_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 30\")..."
@@ -802,7 +802,7 @@ ovs_port_qos_max_rate_update()
   # Insure uuid and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-    ovs_port_qos_update $uuid $other_config $port_max_rate
+    ovs_port_queue_update $uuid $other_config $port_max_rate
 
   else
     echo "Usage: ovs_port_qos_max_rate_update uuid max-rate (e.g. \"ovs_port_qos_max_rate_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 30000000\")..."
@@ -1193,5 +1193,95 @@ ovs_tables_list()
   done
 }
 
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_create_qos_queue()
+{
+  local command=""
+  local other_config=$1
+  local other_config_val=$2
+  
+  command="sudo ovs-vsctl create queue other-config:$other_config=$other_config_val"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_qos_create()
+{
+  local command=""
+  local type=$1
+  
+  command="sudo ovs-vsctl create qos type=$type"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_qos_add_queue()
+{
+  local command=""
+  local uuid=$1
+  local queue_id=$2
+  local queue_uuid=$3
+  
+  #add TBL REC COL [KEY=]VALUE
+
+  command="sudo ovs-vsctl add qos $uuid queues $queue_id=$queue_uuid"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_qos_add_queue()
+{
+  local command=""
+  local uuid=$1
+  local queue_id=$2
+  local queue_uuid=$3
+  
+  command="sudo ovs-vsctl add qos $uuid queues $queue_id=$queue_uuid"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_interface_set_ofport_request()
+{
+  local command=""
+  local iface_name=$1
+  local ofport_request=$2
+
+  # The interface name is something like "tap_port2", the ofport...
+  command="sudo ovs-vsctl set interface $iface_name ofport_request=$ofport_request"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_interface_configure_flow()
+{
+  local command=""
+  local in_port=$1
+  local queue=$1
+
+  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$in_port,actions=set_queue:$queue,normal"
+  echo "Executing: [$command]"
+  $command
+}
+
+
 # Display ovs helper "menu"
 ovs_show_menu
+
