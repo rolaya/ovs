@@ -1018,7 +1018,7 @@ deploy_network()
   vms_start
 
   # Init QoS configuration
-  qos_initialize
+  #qos_initialize
 }
 
 #==================================================================================================================
@@ -1230,23 +1230,6 @@ ovs_qos_add_queue()
   local queue_id=$2
   local queue_uuid=$3
   
-  #add TBL REC COL [KEY=]VALUE
-
-  command="sudo ovs-vsctl add qos $uuid queues $queue_id=$queue_uuid"
-  echo "Executing: [$command]"
-  $command
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-ovs_qos_add_queue()
-{
-  local command=""
-  local uuid=$1
-  local queue_id=$2
-  local queue_uuid=$3
-  
   command="sudo ovs-vsctl add qos $uuid queues $queue_id=$queue_uuid"
   echo "Executing: [$command]"
   $command
@@ -1280,6 +1263,60 @@ ovs_interface_configure_flow()
   echo "Executing: [$command]"
   $command
 }
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_get_value()
+{
+  local command=""
+  local table=$1
+  local record=$2
+  local column=$3
+  local value=""
+
+  echo "Looking for [$column] in table: [$table] with record: [$record]"
+
+  command="sudo ovs-vsctl get $table $record $column"
+  echo "Executing: [$command]"
+  value="$($command)"
+
+  echo "lksjdaksdjas $value"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_find_record()
+{
+  local command=""
+  local table=$1
+  local condition=$2
+  local record=""
+  local record_uuid=""
+
+  echo "Looking for record: [$condition] in table: [$table]"
+
+  # If present, all this will return all columns in the record.
+  command="sudo ovs-vsctl find $table $condition"
+  echo "Executing: [$command]"
+  record="$($command)"
+  echo "$record"
+
+  # For the "port" table for example, the output from the find command is something like:
+  # "_uuid               : 53da5984-7424-4397-97fc-b83ce8e1c582"
+  # "bond_active_slave   : []"
+  # "bond_downdelay      : 0"
+  # "bond_fake_iface     : false"
+  # ...
+  # ...
+  # ...
+  # We are interested in the record's uuid (third field)
+  record_uuid="$(echo "$record" | grep "_uuid" | awk '{print $3}')"
+  
+  echo "$record_uuid"
+}
+
 
 
 # Display ovs helper "menu"
