@@ -1,5 +1,7 @@
 #!/bin/sh
 
+#set -x			# activate debugging from here
+
 # Define text views
 TEXT_VIEW_NORMAL_BLUE="\e[01;34m"
 TEXT_VIEW_NORMAL_RED="\e[31m"
@@ -46,6 +48,8 @@ ether_max_rate=1000000000
 
 # Array of openvswitch tables (incomplete)
 declare -a ovs_tables_array=("Open_vSwitch" "Interface" "Bridge" "Port" "QoS" "Queue" "Flow_Table" "sFlow" "NetFlow" "Datapath")
+
+global_qos_queues_list=""
 
 #==================================================================================================================
 #
@@ -649,6 +653,10 @@ ovs_port_qos_packet_loss_create()
 # Set linux-htb max-rate QoS. This creates a new record ("QoS" table) everytime it is executed.
 # This function "returns" two uuids, one for the QoS and one for the Queue record. The QoS record uuid is required
 # for later operations (e.g. for updating the max-rate for the port).
+#
+# parameters:
+# port:     the virtual port create qos for, e.g tap_port1.
+# max-rate: the max-rate to set the port to.
 #==================================================================================================================
 ovs_port_qos_max_rate_create()
 {
@@ -658,23 +666,46 @@ ovs_port_qos_max_rate_create()
   local interface=$1
   local port_max_rate=$2
   local qos_id=""
+  local qos_uuid=""
+  local queue_uuid=""
   local qos_other_config=""
   local of_port_request=""
   local queue_number=""
-  local qos_uuid=""
-  local queue_uuid=""
   local uuids=""
-
-  # Configure max rate QoS.
+  local qos_linux_htb_defined=false
+  local linux_htb_qos_record_uuid=""
+  local linux_htb_queue_record_uuid=""
+  local old_ifs=""
+  local table=""
 
   # Insure port and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
+    # Find record in "port" table whose "name" is enp5s0 (the name of our wired ethernet interface).
+    table="port"
+    condition="name=$wired_iface"
+    ovs_table_find_record $table "$condition" uuid
+
+    # QoS configured?
+    if [[ "$uuid" != "" ]]; then
+
+      # Get qos uuid associated with port
+      ovs_table_get_value $table $uuid "qos" qos_uuid
+
+      # Remove [] from value
+      qos_uuid=$(echo "$qos_uuid" | sed 's/\[//g')
+      qos_uuid=$(echo "$qos_uuid" | sed 's/\]//g')
+    
+      if [[ "$qos_uuid" != "" ]]; then
+        qos_linux_htb_defined=true
+      fi
+    fi
+
     # For clarity and simplicity set some ovs-vsctl parameters
-    queue_name="${interface}_queue"
     qos_type="linux-htb"
     qos_other_config="max-rate"
-    
+    queue_name="${interface}_queue"
+
     # Make the qos_id as unique as possible (contains port, interface qos type and other qos config),
     # something like "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
     qos_id_format qos_id $interface $qos_type $qos_other_config
@@ -683,37 +714,141 @@ ovs_port_qos_max_rate_create()
     of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
     queue_number=$(echo "$interface" | sed 's/[^0-9]*//g')
 
-    # Format and execute traffic shaping command (creates and initializes new record in QoS table)
-    command="sudo ovs-vsctl -- \
-    set interface $interface ofport_request=$of_port_request -- \
-    set port $wired_iface qos=@$qos_id -- \
-    --id=@$qos_id create qos type=$qos_type \
-        other-config:$qos_other_config=$ether_max_rate \
-        queues:$queue_number=@$queue_name -- \
-    --id=@$queue_name create queue other-config:$qos_other_config=$port_max_rate"
-    echo "excuting: [$command]"
-    uuids="$($command)"
+    # linux-htx/max rate already defined?
+    if [[ "$qos_linux_htb_defined" = false ]]; then
 
-    # Format and execute flow command (creates and initializes new record in Queue table)
-    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
-    echo "excuting: [$command]"
-    $command
+      # Format and execute traffic shaping command (creates and initializes a single 
+      # qos and queue table record). This command returns a uuid for each of the records
+      # created. The second uuid is the uuid of the queue record. This is the record
+      # we update when we want to modify the max-traffic for the port via
+      # ovs_port_qos_max_rate_update.
+      command="sudo ovs-vsctl -- \
+      set interface $interface ofport_request=$of_port_request -- \
+      set port $wired_iface qos=@$qos_id -- \
+      --id=@$qos_id create qos type=$qos_type \
+          other-config:$qos_other_config=$ether_max_rate \
+          queues:$queue_number=@$queue_name -- \
+      --id=@$queue_name create queue other-config:$qos_other_config=$port_max_rate"
+      echo "excuting: [$command]"
+      uuids="$($command)"
+
+      # Backup IFS (this is a "system/environment" wide setting)
+      old_ifs=$IFS
+
+      # Convert LF to space (for use as the IFS)
+      delimeted_uuids=$(echo "$uuids" | tr '\n' ' ')
+
+      # Use space as delimiter
+      IFS=' '
+
+      # uuids are separated by IFS
+      read -ra  uuid_array <<< "$delimeted_uuids"
+      
+      # Restore IFS
+      IFS=$old_ifs
+
+      # (for debugging) save the uuid of the qos, queue records
+      linux_htb_qos_record_uuid="${uuid_array[0]}"
+      linux_htb_queue_record_uuid="${uuid_array[1]}"
+
+      # Format and execute flow command (creates and initializes new record in Queue table)
+      command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
+      echo "excuting: [$command]"
+      $command
+
+    else
+
+      # The "main" linux-htb record exists, we need to add a qos queue for the supplied port, etc.
+      
+      # Create max-rate queue
+      ovs_create_qos_queue $qos_other_config $port_max_rate queue_uuid
+      
+      # Add the queue to the qos list of queues
+      ovs_qos_add_queue $qos_uuid $queue_number $queue_uuid
+
+      # Configure openflow port request
+      ovs_interface_set_ofport_request $interface $of_port_request
+
+      # Configure flow
+      ovs_interface_configure_flow $of_port_request $queue_number
+
+    fi
 
     echo "Created QoS configuration:"
-    echo "bridge:            [$ovs_bridge]"
-    echo "port:              [$wired_iface]"
-    echo "interface:         [$interface]"
-    echo "type:              [$qos_type]"
-    echo "config:            [$qos_other_config]"
-    echo "ether max rate:    [$ether_max_rate]"
-    echo "port max rate:     [$port_max_rate]"
-    echo "qos id:            [$qos_id]"
-    echo "of port request:   [$of_port_request]"
-    echo "of queue number:   [$queue_number]"
-    echo "UUIDs:             [$uuids] (second one is Queue record)"
+    echo "bridge:              [$ovs_bridge]"
+    echo "port:                [$wired_iface]"
+    echo "interface:           [$interface]"
+    echo "type:                [$qos_type]"
+    echo "config:              [$qos_other_config]"
+    echo "ether max rate:      [$ether_max_rate]"
+    echo "port max rate:       [$port_max_rate]"
+    echo "qos id:              [$qos_id]"
+    echo "of port request:     [$of_port_request]"
+    echo "of queue number:     [$queue_number]"
+    echo "qos uuid:            [$linux_htb_qos_record_uuid]"
+    echo "queue uuid:          [$linux_htb_queue_record_uuid]"
 
   else
-    echo "Usage: ovs_port_qos_set_qos port max-rate (e.g. ovs_port_qos_set_qos tap_port1 10000)..."
+    echo "Usage: ovs_port_qos_max_rate_create port max-rate (e.g. ovs_port_qos_max_rate_create tap_port1 10000)..."
+  fi
+}
+
+#==================================================================================================================
+# When the port is the same as the wired interface, we delete all...
+#==================================================================================================================
+ovs_port_qos_linux_htb_max_rate_delete()
+{
+  local command=""
+  local ovs_port=$1
+  local table="port"
+  local condition=""
+  local uuid=""
+  local column="qos"
+  local qos_uuid=""
+  local qos_queues_uuid=""
+  local qos_linux_htb_defined=false
+
+  # Insure port is supplied (something like tap_port1)
+  if [[ $# -eq 1 ]]; then
+
+    if [[ $qos_linux_htb_defined -eq false ]]; then
+
+      condition="name=$ovs_port"
+
+      # Find record in "port" table whose "name" is the port name supplied by caller.
+      ovs_table_find_record $table "$condition" uuid
+
+      if [[ "$uuid" != "" ]]; then
+
+        # Get qos uuid associated with port
+        ovs_table_get_value $table $uuid "qos" qos_uuid
+
+        # Clear "qos" field in "port" table
+        ovs_table_clear_values $table $uuid $column
+
+        # Get list of qos queues uuids (for now, result in global variable)
+        table="qos"
+        ovs_table_get_list $table $qos_uuid "queues"
+
+        # Delete record from qos table
+        table="qos"
+        ovs_table_delete_record $table $qos_uuid
+
+        # Purge records from queues table
+        ovs_queue_table_purge
+
+      else
+        echo -e "${TEXT_VIEW_NORMAL_RED}Error: record [$condition] not found in table: [$table]${TEXT_VIEW_NORMAL}"
+      fi
+    
+    else
+
+      echo "Error detected..."
+
+    fi
+
+  else
+    echo "Usage: ovs_port_qos_linux_htb_max_rate_delete port (e.g. ovs_port_qos_linux_htb_max_rate_delete tap_port1)..."
   fi
 }
 
@@ -729,7 +864,7 @@ ovs_port_queue_update()
 
   # Update QoS max rate.
 
-  # Insure uuid and max rate supplied (and max rate is a number)
+  # Validate parameters
   if [[ $# -eq 3 ]] && [[ $3 -gt 1 ]]; then
 
     # Format and execute traffic shaping command (creates and initializes new record in QoS table)
@@ -742,6 +877,10 @@ ovs_port_queue_update()
     echo "QoS:   [$other_config:$other_config_val]"
 
   else
+
+    echo "Error: failed to pdate QoS configuration:"
+    echo "UUID:  [$uuid]"
+    echo "QoS:   [$other_config:$other_config_val]"
     echo "Usage: ovs_port_queue_update uuid max-rate max-rate-value (e.g. \"ovs_port_queue_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 max-rate 30000000\")"
   fi
 }
@@ -793,7 +932,8 @@ ovs_port_qos_packet_loss_update()
 #==================================================================================================================
 ovs_port_qos_max_rate_update()
 {
-  local uuid=$1
+  #local record_uuid=""
+  local port_number=$1
   local port_max_rate=$2
   local other_config="max-rate"
 
@@ -802,7 +942,12 @@ ovs_port_qos_max_rate_update()
   # Insure uuid and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-    ovs_port_queue_update $uuid $other_config $port_max_rate
+    # Note: when called with a "local varaible the called function does not update... "
+    # Get qos queue record uuid.
+    ovs_port_find_qos_queue_record $port_number record
+
+    # Update port's qos
+    ovs_port_queue_update $record $other_config $port_max_rate
 
   else
     echo "Usage: ovs_port_qos_max_rate_update uuid max-rate (e.g. \"ovs_port_qos_max_rate_update bdc3fe06-edcc-419b-80bd-d523a0628aa2 30000000\")..."
@@ -1198,13 +1343,17 @@ ovs_tables_list()
 #==================================================================================================================
 ovs_create_qos_queue()
 {
+  local uuid=""
   local command=""
   local other_config=$1
   local other_config_val=$2
   
   command="sudo ovs-vsctl create queue other-config:$other_config=$other_config_val"
   echo "Executing: [$command]"
-  $command
+  uuid="$($command)"
+
+  # Return the uuid of the queue created.
+  eval "$3=$uuid"
 }
 
 #==================================================================================================================
@@ -1267,6 +1416,33 @@ ovs_interface_configure_flow()
 #==================================================================================================================
 # 
 #==================================================================================================================
+ovs_table_get_list()
+{
+  local command=""
+  local table=$1
+  local record=$2
+  local column=$3
+  local value=""
+
+  echo "Looking for [$column] in table: [$table] with record id: [$record]"
+
+  command="sudo ovs-vsctl get $table $record $column"
+  echo "Executing: [$command]"
+  value="$($command)"
+
+  if [[ "$value" != "" ]]; then
+    echo "table:   [$table]"
+    echo "record:  [$record]"
+    echo "column:  [$column]"
+    echo "value:   [$value]"
+  fi
+
+  global_qos_queues_list=$value
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 ovs_table_get_value()
 {
   local command=""
@@ -1275,13 +1451,40 @@ ovs_table_get_value()
   local column=$3
   local value=""
 
-  echo "Looking for [$column] in table: [$table] with record: [$record]"
+  echo "Looking for [$column] in table: [$table] with record id: [$record]"
 
   command="sudo ovs-vsctl get $table $record $column"
   echo "Executing: [$command]"
   value="$($command)"
 
-  echo "lksjdaksdjas $value"
+  if [[ "$value" != "" ]]; then
+    echo "table:   [$table]"
+    echo "record:  [$record]"
+    echo "column:  [$column]"
+    echo "value:   [$value]"
+  fi
+
+  eval "$4=$value"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_clear_values()
+{
+  local command=""
+  local table=$1
+  local record=$2
+  local column=$3
+  local value=""
+
+  echo "Clearing [$column] in table: [$table] for record: [$record]"
+
+  command="sudo ovs-vsctl clear $table $record $column"
+  echo "Executing: [$command]"
+  value="$($command)"
+
+  #echo "lksjdaksdjas $value"
 }
 
 #==================================================================================================================
@@ -1315,9 +1518,228 @@ ovs_table_find_record()
   record_uuid="$(echo "$record" | grep "_uuid" | awk '{print $3}')"
   
   echo "$record_uuid"
+
+  # Update the third parameter passed with the uuid of the record found (if any)
+  eval "$3=$record_uuid"
 }
 
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_delete_record()
+{
+  local command=""
+  local table=$1
+  local uuid=$2
+  local result=""
 
+  echo "Deleting record: [$uuid] from table: [$table]"
+
+  # Delete record from table given table and uuid.
+  command="sudo ovs-vsctl destroy $table $uuid"
+  echo "Executing: [$command]"
+  result="$($command)"
+  echo "$result"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_queue_table_purge()
+{
+  local uuid=""
+  local index=0
+  local uuids=""
+  local old_ifs=""
+  local uuid_array=""
+  local arraylength=0
+  local local_debug=True
+  local table="queue"
+  
+  # Backup IFS (this is a shell "system/environment" wide setting)
+  old_ifs=$IFS
+
+  # Remove {} from qos_queues_uuid
+  uuids=$(echo "$global_qos_queues_list" | sed 's/{//g')
+  uuids=$(echo "$uuids" | sed 's/}//g')
+
+  #echo "$uuids" | tee uuids.txt
+
+  # Use space as delimiter
+  IFS=' ,'
+
+  # uuids are separated by IFS
+  read -ra  uuid_array <<< "$uuids"
+
+  arraylength=${#uuid_array[@]}
+
+  echo "processing: [$arraylength] uuids..."
+
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    echo "uuid[$index]: [$uuid]"
+
+    # Delete record from queue table
+    ovs_table_delete_record $table $uuid
+
+    ((index++))
+  done
+
+  # Restore IFS
+  IFS=$old_ifs
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_extract_uuids()
+{
+  local index=0
+  local uuids=$1
+  local old_ifs=""
+  local uuid_array=""
+  local arraylength=0
+  local delimeted_uuids=""
+  local local_debug=True
+  
+  # Backup IFS (this is a "system/environment" wide setting)
+  old_ifs=$IFS
+
+  # Convert LF to space (for use as the IFS)
+  delimeted_uuids=$(echo "$uuids" | tr '\n' ' ')
+
+  #echo "$uuids" | tee uuids.txt
+
+  # Use space as delimiter
+  IFS=' '
+
+  # uuids are separated by IFS
+  read -ra  uuid_array <<< "$delimeted_uuids"
+
+  # For debugging purposes (set local_debug= True)
+  if [[ $local_debug -eq True ]]; then
+
+    arraylength=${#uuid_array[@]}
+
+    echo "processing: [$arraylength] uuids..."
+
+    for i in "${uuid_array[@]}"; do
+      echo "uuid[$index]: [$i]"
+      ((index++))
+    done
+
+  fi
+
+  # Restore IFS
+  IFS=$old_ifs
+
+  # Update the third parameter passed with the uuid of the record found (if any)
+  eval "$2=$uuid_array" 
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_purge_qos_records()
+{
+  local command=""
+  local table=""
+
+  local table="qos"
+  command="sudo ovs-vsctl purge $table"
+  echo "Executing: [$command]"
+  $command
+
+  local table="queue"
+  command="sudo ovs-vsctl purge $table"
+  echo "Executing: [$command]"
+  $command  
+}
+
+#==================================================================================================================
+#==================================================================================================================
+ovs_port_find_qos_queue_record()
+{
+  local port_number=$1
+  local command=""
+  local table=""
+  local condidion=""
+  local uuid=""
+  local qos_uuid=""
+  local value=""
+  local old_ifs=""
+  local index=0
+  local uuid_array=""
+  local arraylength=0
+  local uuids=""
+  local queue_number=""
+  local record_uuid=""
+
+  echo "Find qos queue record uuid for port: [$port_number]..."
+
+  # Find record in "port" table whose "name" is enp5s0 (the name of our wired ethernet interface).
+  table="port"
+  condition="name=$wired_iface"
+  ovs_table_find_record $table "$condition" uuid
+
+  # Get qos uuid associated with port
+  table="port"
+  value="qos"
+  ovs_table_get_value $table $uuid $value qos_uuid
+
+  # Get list of qos queues uuids (for now, result in global variable)
+  table="qos"
+  ovs_table_get_list $table $qos_uuid "queues"
+  
+  # Backup IFS (this is a shell "system/environment" wide setting)
+  old_ifs=$IFS
+
+  # Remove {} from qos_queues_uuid
+  uuids=$(echo "$global_qos_queues_list" | sed 's/{//g')
+  uuids=$(echo "$uuids" | sed 's/}//g')
+
+  # Use space as delimiter
+  IFS=' ,'
+
+  # uuids are separated by IFS
+  read -ra  uuid_array <<< "$uuids"
+
+  arraylength=${#uuid_array[@]}
+
+  echo "processing: [$arraylength] uuids..."
+
+  # Find qos queue based on port number
+  for uuid in "${uuid_array[@]}"; do
+
+    # Extract the queue number from the queues, a single queue value is something like:
+    # 1=50ebde1e-1700-4edb-b18e-366353da3827
+    queue_number=${uuid%%=*}
+
+    #echo "quee number: ${uuid%%=*} $queue_number"
+    #echo "uuid[$index]: [$uuid]"
+
+    # Is this the entry we are looking for?
+    if [[ "$queue_number" -eq "$port_number" ]]; then
+
+      # Save the actual record uuid, something like:
+      # 50ebde1e-1700-4edb-b18e-366353da3827
+      record_uuid=$(echo ${uuid:(-36)})
+    fi
+
+    ((index++))
+  
+  done
+
+  # Restore IFS
+  IFS=$old_ifs
+
+  echo "Qos queue record uuid for port [$port_number]: [$record_uuid]"
+
+  # Pass value back to caller
+  eval "$2=$record_uuid"   
+}  
 
 # Display ovs helper "menu"
 ovs_show_menu
