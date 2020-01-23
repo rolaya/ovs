@@ -23,10 +23,10 @@ number_of_interfaces=1
 
 # Default port name. Once generated, you will have something like:
 # tap_port1, tap_port2, ... (depends on "number_of_interfaces").
-port_name="tap_port"
+port_name_base="tap_port"
 
 # VirtualBox looks at this as the network name
-network_name=$port_name
+network_name=$port_name_base
 
 # For clarity, use number of VMs variable (it is the same as the number of ports/interfaces)
 number_of_vms=$number_of_interfaces
@@ -60,7 +60,7 @@ ovs_show_menu()
   local vm_name_sample=""
 
   # Initialize misc. for display to user
-  port_name_sample=$port_name
+  port_name_sample=$port_name_base
   port_name_sample+="1"
 
   vm_name_sample=$vm_base_name
@@ -75,7 +75,7 @@ ovs_show_menu()
   echo "Default bridge name:        [$ovs_bridge]"
   echo "Number of VMs in testbed:   [$number_of_vms]"
   echo "Expected VM base name:      [$vm_name_sample]. VM names will be sequential starting with [$vm_name_sample]"
-  echo "VM base port name:          [$port_name]. Port names will be sequential starting with [$port_name_sample]"
+  echo "VM base port name:          [$port_name_base]. Port names will be sequential starting with [$port_name_sample]"
 
   echo
   echo
@@ -263,7 +263,7 @@ ovs_bridge_del_port()
 ovs_bridge_add_ports()
 {
   local bridge=$1
-  local port=${2:-$port_name}
+  local port=${2:-$port_name_base}
   
   echo "Adding ports to bridge $bridge..."
 
@@ -395,7 +395,7 @@ ovs_deploy_network()
 #==================================================================================================================
 ovs_purge_network_deployment()
 {
-  local port=${2:-$port_name}
+  local port=${2:-$port_name_base}
 
   # Update path with ovs scripts path.
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
@@ -520,65 +520,18 @@ qos_id_format()
 #==================================================================================================================
 ovs_port_qos_latency_create()
 {
-  local command=""
-  local queue_name=""
+  local port_number=$1
+  local port_name=""
   local qos_type=""
-  local interface=$1
-  local latency=$2
-  local qos_id=""
   local qos_other_config=""
-  local of_port_request=""
-  local queue_number=""
-  local qos_uuid=""
-  local queue_uuid=""
-  local uuids=""
+  local qos_other_config_value=$2
 
-  # Configure (netem latency) traffic shaping on interface.
+  port_name="$port_name_base$port_number"
+  qos_type="linux-netem"
+  qos_other_config="latency"
   
-  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
-
-    # For clarity and simplicity set some ovs-vsctl parameters
-    queue_name="${interface}_queue"
-    qos_type="linux-netem"
-    qos_other_config="latency"
-    
-    # Make the qos_id as unique as possible (contains port, interface qos type and other qos config),
-    # something like "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
-    qos_id_format qos_id $interface $qos_type $qos_other_config
-
-    # We use the number part of the interface as the openflow port request and openflow queue number
-    of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
-    queue_number=$(echo "$interface" | sed 's/[^0-9]*//g')
-
-    command="sudo ovs-vsctl -- \
-    set interface $interface ofport_request=$of_port_request -- \
-    set port $wired_iface qos=@$qos_id -- \
-    --id=@$qos_id create qos type=$qos_type \
-        other-config:$qos_other_config=$latency \
-        queues:$queue_number=@$queue_name -- \
-    --id=@$queue_name create queue other-config:$qos_other_config=$latency"
-    echo "excuting: [$command]"
-    $command
-
-    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
-    echo "excuting: [$command]"
-    $command
-
-    echo "Created QoS configuration:"
-    echo "bridge:            [$ovs_bridge]"
-    echo "port:              [$wired_iface]"
-    echo "interface:         [$interface]"
-    echo "type:              [$qos_type]"
-    echo "config:            [$qos_other_config]"
-    echo "latency:           [$latency]"
-    echo "qos id:            [$qos_id]"
-    echo "of port request:   [$of_port_request]"
-    echo "of queue number:   [$queue_number]"
-    echo "UUIDs:             [$uuids] (second one is Queue record)"
-
-  else
-    echo "Usage: ovs_port_qos_packet_loss_create port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
-  fi
+  # Configure (netem latency) traffic shaping on interface.
+  ovs_port_qos_create $port_name $qos_type $qos_other_config $qos_other_config_value
 }
 
 #==================================================================================================================
@@ -586,67 +539,18 @@ ovs_port_qos_latency_create()
 #==================================================================================================================
 ovs_port_qos_packet_loss_create()
 {
-  local command=""
-  local queue_name=""
+  local port_number=$1
+  local port_name=""
   local qos_type=""
-  local interface=$1
-  local packet_loss=$2
-  local qos_id=""
   local qos_other_config=""
-  local of_port_request=""
-  local queue_number=""
-  local qos_uuid=""
-  local queue_uuid=""
-  local uuids=""
+  local qos_other_config_value=$2
 
-  # Configure (netem packet loss) traffic shaping on interface.
-
-  # Insure port and max rate supplied (and max rate is a number)
-  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
-
-    # For clarity and simplicity set some ovs-vsctl parameters
-    queue_name="${interface}_queue"
-    qos_type="linux-netem"
-    qos_other_config="loss"
-    
-    # Make the qos_id as unique as possible (contains port, interface qos type and other qos config),
-    # something like "qos_id_enp5s0_tap_port1_linux-htb_max-rate"
-    qos_id_format qos_id $interface $qos_type $qos_other_config
-
-    # We use the number part of the interface as the openflow port request and openflow queue number
-    of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
-    queue_number=$(echo "$interface" | sed 's/[^0-9]*//g')
+  port_name="$port_name_base$port_number"
+  qos_type="linux-netem"
+  qos_other_config="loss"
   
-    command="sudo ovs-vsctl -- \
-    set interface $interface ofport_request=$of_port_request -- \
-    set port $wired_iface qos=@$qos_id -- \
-    --id=@$qos_id create qos type=$qos_type \
-        other-config:loss=$packet_loss \
-        queues:$queue_number=@$queue_name -- \
-    --id=@$queue_name create queue other-config:$qos_other_config=$packet_loss"
-    echo "excuting: [$command]"
-    $command
-
-    # Format and execute flow command (creates and initializes new record in Queue table)
-    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
-    echo "excuting: [$command]"
-    $command
-
-    echo "Created QoS configuration:"
-    echo "bridge:            [$ovs_bridge]"
-    echo "port:              [$wired_iface]"
-    echo "interface:         [$interface]"
-    echo "type:              [$qos_type]"
-    echo "config:            [$qos_other_config]"
-    echo "packet loss:       [$packet_loss]"
-    echo "qos id:            [$qos_id]"
-    echo "of port request:   [$of_port_request]"
-    echo "of queue number:   [$queue_number]"
-    echo "UUIDs:             [$uuids] (second one is Queue record)"
-
-  else
-    echo "Usage: ovs_port_qos_packet_loss_create port loss (e.g. ovs_port_qos_set_qos tap_port1 20)..."
-  fi
+  # Configure (netem loss) traffic shaping on interface.
+  ovs_port_qos_create $port_name $qos_type $qos_other_config $qos_other_config_value
 }
 
 #==================================================================================================================
@@ -660,15 +564,39 @@ ovs_port_qos_packet_loss_create()
 #==================================================================================================================
 ovs_port_qos_max_rate_create()
 {
+  local port_number=$1
+  local port_name=""
+  local qos_type=""
+  local qos_other_config=""
+  local qos_other_config_value=$2
+
+  port_name="$port_name_base$port_number"
+  qos_type="linux-htb"
+  qos_other_config="max-rate"
+  
+  ovs_port_qos_create $port_name $qos_type $qos_other_config $qos_other_config_value
+}
+
+#==================================================================================================================
+# Set linux-htb max-rate QoS. This creates a new record ("QoS" table) everytime it is executed.
+# This function "returns" two uuids, one for the QoS and one for the Queue record. The QoS record uuid is required
+# for later operations (e.g. for updating the max-rate for the port).
+#
+# parameters:
+# port:     the virtual port create qos for, e.g tap_port1.
+# max-rate: the max-rate to set the port to.
+#==================================================================================================================
+ovs_port_qos_create()
+{
   local command=""
   local queue_name=""
-  local qos_type=""
   local interface=$1
-  local port_max_rate=$2
+  local qos_type=$2
+  local qos_other_config=$3
+  local qos_other_config_value=$4
   local qos_id=""
   local qos_uuid=""
   local queue_uuid=""
-  local qos_other_config=""
   local of_port_request=""
   local queue_number=""
   local uuids=""
@@ -678,8 +606,14 @@ ovs_port_qos_max_rate_create()
   local old_ifs=""
   local table=""
 
+  echo "Creating qos:"
+  echo "port:               [$interface]"
+  echo "qos type:           [$qos_type]"
+  echo "other config:       [$qos_other_config]"
+  echo "other config value: [$qos_other_config_value]"
+
   # Insure port and max rate supplied (and max rate is a number)
-  if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
+  if [[ $# -eq 4 ]] && [[ $4 -gt 0 ]]; then
 
     # Find record in "port" table whose "name" is enp5s0 (the name of our wired ethernet interface).
     table="port"
@@ -702,8 +636,8 @@ ovs_port_qos_max_rate_create()
     fi
 
     # For clarity and simplicity set some ovs-vsctl parameters
-    qos_type="linux-htb"
-    qos_other_config="max-rate"
+    #qos_type="linux-htb"
+    #qos_other_config="max-rate"
     queue_name="${interface}_queue"
 
     # Make the qos_id as unique as possible (contains port, interface qos type and other qos config),
@@ -726,9 +660,9 @@ ovs_port_qos_max_rate_create()
       set interface $interface ofport_request=$of_port_request -- \
       set port $wired_iface qos=@$qos_id -- \
       --id=@$qos_id create qos type=$qos_type \
-          other-config:$qos_other_config=$ether_max_rate \
+          other-config:$qos_other_config=$qos_other_config_value \
           queues:$queue_number=@$queue_name -- \
-      --id=@$queue_name create queue other-config:$qos_other_config=$port_max_rate"
+      --id=@$queue_name create queue other-config:$qos_other_config=$qos_other_config_value"
       echo "excuting: [$command]"
       uuids="$($command)"
 
@@ -779,9 +713,8 @@ ovs_port_qos_max_rate_create()
     echo "port:                [$wired_iface]"
     echo "interface:           [$interface]"
     echo "type:                [$qos_type]"
-    echo "config:              [$qos_other_config]"
-    echo "ether max rate:      [$ether_max_rate]"
-    echo "port max rate:       [$port_max_rate]"
+    echo "other config:        [$qos_other_config]"
+    echo "other config value:  [$qos_other_config_value]"
     echo "qos id:              [$qos_id]"
     echo "of port request:     [$of_port_request]"
     echo "of queue number:     [$queue_number]"
@@ -789,7 +722,7 @@ ovs_port_qos_max_rate_create()
     echo "queue uuid:          [$linux_htb_queue_record_uuid]"
 
   else
-    echo "Usage: ovs_port_qos_max_rate_create port max-rate (e.g. ovs_port_qos_max_rate_create tap_port1 10000)..."
+    echo "Usage: ovs_port_qos_create port max-rate (e.g. ovs_port_qos_create tap_port1 10000)..."
   fi
 }
 
@@ -960,7 +893,7 @@ ovs_port_qos_max_rate_update()
 ovs_bridge_del_ports()
 {
   local bridge=$1
-  local port=${2:-$port_name}
+  local port=${2:-$port_name_base}
 
   # These commands are executed as "root" user (for now)
   
@@ -1171,22 +1104,15 @@ deploy_network()
 #==================================================================================================================
 qos_initialize()
 {
-  local port=""
-
   echo "Configuring QoS..."
   echo "Initializing QoS max-rate..."
 
   for ((i = 1; i <= $number_of_vms; i++)) do
 
-    # This is something like tap_port1
-    port="$port_name"
-    port+="$i"
-
     # Create QoS record (defaulting to max ethernet rate on each port)
-    ovs_port_qos_max_rate_create $port $ether_max_rate
+    ovs_port_qos_max_rate_create "$i" $ether_max_rate
   done
 }
-
 
 #==================================================================================================================
 #
