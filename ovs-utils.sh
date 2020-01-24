@@ -69,10 +69,21 @@ g_qos_queue_record_uuid=""
 #==================================================================================================================
 #
 #==================================================================================================================
+ovs_show_menu_option()
+{
+  local command_name=$1
+  local command_description=$2
+  echo -e "${TEXT_VIEW_NORMAL_BLUE}$command_name${TEXT_VIEW_NORMAL} $command_description"
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
 ovs_show_menu()
 {
   local port_name_sample=""
   local vm_name_sample=""
+  local first_vm="1"
 
   # Initialize misc. for display to user
   port_name_sample=$port_name_base
@@ -81,73 +92,105 @@ ovs_show_menu()
   vm_name_sample=$vm_base_name
   vm_name_sample+="1"
 
-  # Display current hardcoded configuration 
+  # Environment 
   echo
-  echo "Current configuration (currently hardcoded)"
-  echo "Manually update these values in this file according to your network configuration"
-  echo "Wired interface:            [$wired_iface]"
-  echo "Wired interface IP address: [$wired_iface_ip]"
-  echo "Default bridge name:        [$ovs_bridge]"
-  echo "Number of VMs in testbed:   [$number_of_vms]"
-  echo "Expected VM base name:      [$vm_name_sample]. VM names will be sequential starting with [$vm_name_sample]"
-  echo "VM base port name:          [$port_name_base]. Port names will be sequential starting with [$port_name_sample]"
-
-  echo
-  echo
-
-  # Environment provisioning
-  echo "Provisioning commands"
-  echo "\"ovs_provision_for_build\"           - Provision system for building ovs"
-  
-  # Display some helpers to the user
-  echo "Main commands"
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}Environment"
   echo "=========================================================================================================================="
-  echo "\"ovs_show_menu\"                     - Displays this menu"
-  echo "\"ovs_start\"                         - Starts OVS daemons"
-  echo "\"ovs_stop\"                          - Stops OVS daemons"
-  echo "\"ovs_restart\"                       - Restarts OVS daemons"
+  echo -e "${TEXT_VIEW_NORMAL}"
 
-  echo "\"ovs_start_test\"                    - Starts OVS daemons, deploys network configuration and configures QoS"
-  echo "\"ovs_stop_test\"                     - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
-  echo "\"vms_start\"                         - Start all VMs in the testbed"
-  echo "\"vms_stop\"                          - Stop all VMs in the testbed"
-
+  echo "Network interface:            [$wired_iface]"
+  echo "Network interface IP address: [$wired_iface_ip]"
+  echo "Default bridge name:          [$ovs_bridge]"
+  echo "Number of VMs in testbed:     [$number_of_vms]"
+  echo "VM base name:                 [$vm_base_name]"
+  echo "VM range:                     [$vm_base_name$first_vm..$vm_base_name$number_of_vms]"
+  echo "VM port range:                [$port_name_base$first_vm..$port_name_base$number_of_vms]"
   echo
 
-  echo "\"ovs_bridge_add\"                    - Add bridge to system"
-  echo "\"ovs_bridge_add_ports\"              - Add ports to bridge"
-  echo "\"ovs_bridge_del\"                    - Delete bridge to system"
-  echo "\"ovs_bridge_del_ports\"              - Delete ports from bridge"
+  # Deployment
+  echo
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}Deployment"
+  echo "=========================================================================================================================="
+  echo -e "${TEXT_VIEW_NORMAL}"
+  ovs_show_menu_option "ovs_start                        " " - Start OVS daemons (must be executed as root)"
+  ovs_show_menu_option "deploy_network                   " " - Deploy network configuration and launch VMs"
+  echo
+
+   # Traffic shaping
+  echo
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}Traffic shaping"
+  echo "=========================================================================================================================="
+  echo -e "${TEXT_VIEW_NORMAL}"
+  ovs_show_menu_option "ovs_port_qos_max_rate_create     " " - set port bandwidth (mbps)"
+  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_create port_number bandwidth"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 1000000"
+
+  ovs_show_menu_option "ovs_port_qos_packet_loss_create  " " - set port packet loss (%)"
+  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_create port_number packet_loss"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 30"
+
+  ovs_show_menu_option "ovs_port_qos_latency_create      " " - set port latency (microseconds)"
+  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_latency_create port_number latency"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 500000"
+
+  ovs_show_menu_option "ovs_port_qos_max_rate_update     " " - update port bandwidth (mbps)"
+  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_update port_number bandwidth"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_update 1 500000"
+
+  ovs_show_menu_option "ovs_port_qos_packet_loss_update  " " - update port packet loss (%)"
+  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_update port_number packet_loss"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_update 1 30"
+
+  ovs_show_menu_option "ovs_port_qos_latency_update      " " - update port latency (microseconds)"
+  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_latency_update port_number latency"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_latency_update 1 500000"
+
+  #echo "\"ovs_bridge_add\"                    - Add bridge to system"
+  #echo "\"ovs_bridge_add_ports\"              - Add ports to bridge"
+  #echo "\"ovs_bridge_del\"                    - Delete bridge to system"
+  #echo "\"ovs_bridge_del_ports\"              - Delete ports from bridge"
 
   # Hypervisor commands
-  echo "Hypervisor commands"
-  echo "=========================================================================================================================="
-  echo "\"vm_set_network_interface\"          - Set VM's NIC \"network\" (this is an existing port in an OVS bridge)"
-  echo "\"vms_set_network_interface\"         - Set all VM's NIC \"network\" interface"
+  #echo "Hypervisor commands"
+  #echo "=========================================================================================================================="
+  #echo "\"vm_set_network_interface\"          - Set VM's NIC \"network\" (this is an existing port in an OVS bridge)"
+  #echo "\"vms_set_network_interface\"         - Set all VM's NIC \"network\" interface"
 
-  echo
-  echo "Network deployment and QoS configuration commands"
-  echo "=========================================================================================================================="
-  echo "\"ovs_deploy_network\"                   - Deploys network configuration"
-  echo "\"ovs_set_qos\"                          - Configures QoS"
-  echo "\"ovs_vm_set_qos\"                       - Configures QoS for specific vm3 (vm attached to tap_port3)"
-  echo "\"ovs_port_qos_latency_create\"          - Create QoS record - latency (netem) on specified port"
-  echo "                                         ex: ovs_port_qos_latency_create tap_port3 2000000"
-  echo "\"ovs_port_qos_packet_loss_create\"      - Create QoS record - packet loss as a percentage (netem) on specified port"
-  echo "                                         ex: ovs_port_qos_packet_loss_create tap_port3 10"
-  echo "\"ovs_port_qos_max_rate_create\"         - Create QoS record - max rate on specified port"
-  echo "\"ovs_port_qos_max_rate_update\"         - Update QoS record - max rate on specified port"
-  echo "\"ovs_port_qos_packet_loss_update\"      - Update QoS record - packet loss on specified port"
-  echo "\"ovs_port_qos_latency_update\"          - Update QoS record - latency on specified port"
+  #echo
+  #echo "Network deployment and QoS configuration commands"
+  #echo "=========================================================================================================================="
+  #echo "\"ovs_deploy_network\"                   - Deploys network configuration"
+  #echo "\"ovs_set_qos\"                          - Configures QoS"
+  #echo "\"ovs_vm_set_qos\"                       - Configures QoS for specific vm3 (vm attached to tap_port3)"
+  #echo "\"ovs_port_qos_max_rate_update\"         - Update QoS record - max rate on specified port"
+  #echo "\"ovs_port_qos_packet_loss_update\"      - Update QoS record - packet loss on specified port"
+  #echo "\"ovs_port_qos_latency_update\"          - Update QoS record - latency on specified port"
   
-  echo "\"ovs_purge_network\"                    - Purge deployed network (and QoS)"
+  #echo "\"ovs_purge_network\"                    - Purge deployed network (and QoS)"
   
-  echo
-  echo "Project build/install related commands"
-  echo "=========================================================================================================================="
-  echo "\"ovs_install\"                          - Builds and installs OVS daemons and kernel modules"
-  echo "\"ovs_configure_debug_build\"            - Configures OVS project for debug build"
-  echo "\"ovs_configure_release_build\"          - Configures OVS project for release build"
+  #echo
+  #echo "Project build/install related commands"
+  #echo "=========================================================================================================================="
+  #echo "\"ovs_install\"                          - Builds and installs OVS daemons and kernel modules"
+  #echo "\"ovs_configure_debug_build\"            - Configures OVS project for debug build"
+  #echo "\"ovs_configure_release_build\"          - Configures OVS project for release build"
+
+   # Display some helpers to the user
+  #echo "Main commands"
+  #echo "=========================================================================================================================="
+  #echo "\"ovs_show_menu\"                     - Displays this menu"
+  #echo "\"ovs_start\"                         - Starts OVS daemons"
+  #echo "\"ovs_stop\"                          - Stops OVS daemons"
+  #echo "\"ovs_restart\"                       - Restarts OVS daemons"
+
+  #echo "\"ovs_start_test\"                    - Starts OVS daemons, deploys network configuration and configures QoS"
+  #echo "\"ovs_stop_test\"                     - Purges network configuration, QoS, restores wired interface and stops OVS daemons"
+  #echo "\"vms_start\"                         - Start all VMs in the testbed"
+  #echo "\"vms_stop\"                          - Stop all VMs in the testbed" 
+
+  # Environment provisioning
+  #echo "Provisioning commands"
+  #echo "\"ovs_provision_for_build\"           - Provision system for building ovs" 
 }
 
 #==================================================================================================================
