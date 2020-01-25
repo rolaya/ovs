@@ -10,10 +10,10 @@ TEXT_VIEW_NORMAL_PURPLE="\e[177m"
 TEXT_VIEW_NORMAL='\e[00m'
 
 # The name of the physical wired interface (host specific)
-wired_iface=enp5s0
+wired_iface=enp0s3
 
 # The IP address assigned (by the DHCP server) to the host's wired interface (host specific)
-wired_iface_ip=192.168.1.206
+wired_iface_ip=192.168.1.157
 
 # The name of the OVS bridge to create (it can be anything)
 ovs_bridge=br0
@@ -2110,18 +2110,44 @@ qos_set_latency()
   $command   
 }
 
+#==================================================================================================================
+#
+#==================================================================================================================
+centos_firewall_allow_nfs()
+{
+  local command=""
+
+  echo "Configuring firewall to enable NFS..."
+
+  command="sudo firewall-cmd --permanent --zone=public --add-service=nfs"
+  echo "Executing: [$command]"
+  $command 
+  
+  command="sudo firewall-cmd --permanent --zone=public --add-service=mountd"
+  echo "Executing: [$command]"
+  $command 
+  
+  command="sudo firewall-cmd --permanent --zone=public --add-service=rpc-bind"
+  echo "Executing: [$command]"
+  $command 
+  
+  command="sudo firewall-cmd --reload"
+  echo "Executing: [$command]"
+  $command      
+}
+
+
+centos_install_virtualbox()
+{
+  sudo dnf config-manager --add-repo=https://download.virtualbox.org/virtualbox/rpm/el/virtualbox.repo
+  sudo rpm --import https://www.virtualbox.org/download/oracle_vbox.asc
+  sudo dnf search virtualbox
+  sudo dnf install VirtualBox-6.1.x86_64
+}
 
 # Display ovs helper "menu"
 ovs_show_menu
 
-#rolaya
-#todo: 
-#6vms
-#mixed testing
-#documentation
-#email reply
-#verizon ip address
-#static ip address for host
 
 
 
