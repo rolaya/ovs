@@ -1551,29 +1551,40 @@ static void clean_percpu(struct work_struct *work)
 }
 
 #ifdef HAVE_NF_HOOKFN_ARG_OPS
+1111
 #define FIRST_PARAM const struct nf_hook_ops *ops
 #else
+//222 this is configured
 #ifdef HAVE_NF_HOOKFN_ARG_PRIV
+///3333 this is configuired
 #define FIRST_PARAM void *priv
 #else
+4444
 #define FIRST_PARAM unsigned int hooknum
 #endif
 #endif
 
 #ifdef HAVE_NF_HOOK_STATE
+//5555  this is configured
 #if RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,0)
+//666 this is configured
 /* RHEL nfhook hacks. */
 #ifndef __GENKSYMS__
-#define LAST_PARAM const struct net_device *in, const struct net_device *out, \
+//7777 this is configured
+//#define LAST_PARAM const struct net_device *in, const struct net_device *out, \
 		   const struct nf_hook_state *state
+#define LAST_PARAM const struct nf_hook_state *state
 #else
+8888
 #define LAST_PARAM const struct net_device *in, const struct net_device *out, \
 		   int (*okfn)(struct sk_buff *)
 #endif
 #else
+9999
 #define LAST_PARAM const struct nf_hook_state *state
 #endif
 #else
+10
 #define LAST_PARAM const struct net_device *in, const struct net_device *out, \
 		   int (*okfn)(struct sk_buff *)
 #endif
