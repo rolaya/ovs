@@ -6,7 +6,11 @@
 TEXT_VIEW_NORMAL_BLUE="\e[01;34m"
 TEXT_VIEW_NORMAL_RED="\e[31m"
 TEXT_VIEW_NORMAL_GREEN="\e[32m"
+TEXT_VIEW_NORMAL_MAGENTA="\e[35m"
+TEXT_VIEW_NORMAL_YELLOW="\e[93m"
+
 TEXT_VIEW_NORMAL_PURPLE="\e[177m"
+TEXT_VIEW_NORMAL_ORANGE="\e[209m"
 TEXT_VIEW_NORMAL='\e[00m'
 
 # The name of the physical wired interface (host specific)
@@ -66,6 +70,14 @@ map_qos_type_queue_number_partition["linux-netem.loss"]=300
 g_qos_queue_number=0
 g_qos_queue_record_uuid=""
 
+# This flag should normally be set to true (because we want to start the VMs in out network). But
+# just in case (for some reason) we do not want to start the VMs immediately after configuring the 
+# network, we can manage that here.
+g_start_vms_upon_network_provisioning=true
+
+# Capture time when file was sourced 
+g_sourced_datetime="$(date +%c)"
+
 #==================================================================================================================
 #
 #==================================================================================================================
@@ -81,6 +93,7 @@ ovs_show_menu_option()
 #==================================================================================================================
 ovs_show_menu()
 {
+  local datetime=""
   local port_name_sample=""
   local vm_name_sample=""
   local first_vm="1"
@@ -98,6 +111,11 @@ ovs_show_menu()
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
 
+  # Get date/time (useful for keeping track of changes)
+  datetime="$(date +%c)"
+
+  echo "Sourced time:                 [$g_sourced_datetime]"
+  echo "Current time:                 [$datetime]"
   echo "Network interface:            [$wired_iface]"
   echo "Network interface IP address: [$wired_iface_ip]"
   echo "Default bridge name:          [$ovs_bridge]"
@@ -1457,16 +1475,33 @@ vm_deploy()
 #==================================================================================================================
 # 
 #==================================================================================================================
+show_warning_msg()
+{
+  local msg="$1"
+
+  echo -e "${TEXT_VIEW_NORMAL_MAGENTA}$msg${TEXT_VIEW_NORMAL}"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 deploy_network()
 {
+  local msg=""
+
   # Deploy network
   ovs_deploy_network
   
   # "Attach" VM's network interface to bridge ports
   vms_set_network_interface
   
-  # Start all VMs in the testbed
-  vms_start
+  if [[ "$g_start_vms_upon_network_provisioning" = true ]]; then
+    # Start all VMs in the testbed
+    vms_start
+  else
+    msg="Warning [$number_of_interfaces] VM(s) not started as per configuration!!!"
+    show_warning_msg "$msg"
+  fi
 
   # Init QoS configuration
   #qos_initialize
@@ -2137,12 +2172,39 @@ centos_firewall_allow_nfs()
 }
 
 
+#==================================================================================================================
+#
+#==================================================================================================================
 centos_install_virtualbox()
 {
   sudo dnf config-manager --add-repo=https://download.virtualbox.org/virtualbox/rpm/el/virtualbox.repo
   sudo rpm --import https://www.virtualbox.org/download/oracle_vbox.asc
   sudo dnf search virtualbox
   sudo dnf install VirtualBox-6.1.x86_64
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+centos_provision_ovs_build()
+{
+  local command=""
+
+  command="sudo yum install make gcc curl wget"
+  echo "Executing: [$command]"
+  $command  
+  
+  command="sudo yum install vim openssl-devel autoconf automake"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo yum install rpm-build libtool redhat-rpm-config"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo yum install python-devel openssl-devel kernel-devel kernel-debug-devel"
+  echo "Executing: [$command]"
+  $command  
 }
 
 # Display ovs helper "menu"
