@@ -114,15 +114,17 @@ ovs_show_menu()
   # Get date/time (useful for keeping track of changes)
   datetime="$(date +%c)"
 
-  echo "Sourced time:                 [$g_sourced_datetime]"
-  echo "Current time:                 [$datetime]"
-  echo "Network interface:            [$wired_iface]"
-  echo "Network interface IP address: [$wired_iface_ip]"
-  echo "Default bridge name:          [$ovs_bridge]"
-  echo "Number of VMs in testbed:     [$number_of_vms]"
-  echo "VM base name:                 [$vm_base_name]"
-  echo "VM range:                     [$vm_base_name$first_vm..$vm_base_name$number_of_vms]"
-  echo "VM port range:                [$port_name_base$first_vm..$port_name_base$number_of_vms]"
+  echo "Host name:                       [$HOSTNAME]"
+  echo "Sourced time:                    [$g_sourced_datetime]"
+  echo "Current time:                    [$datetime]"
+  echo "Using DHCP for host's IP:        [$use_dhcp]"
+  echo "Network interface:               [$wired_iface]"
+  echo "Network interface IP address:    [$wired_iface_ip]"
+  echo "Default bridge name:             [$ovs_bridge]"
+  echo "Number of VMs in testbed:        [$number_of_vms]"
+  echo "VM base name:                    [$vm_base_name]"
+  echo "VM range:                        [$vm_base_name$first_vm..$vm_base_name$number_of_vms]"
+  echo "VM port range:                   [$port_name_base$first_vm..$port_name_base$number_of_vms]"
   echo
 
   # Deployment
@@ -456,6 +458,10 @@ ovs_deploy_network()
   if [[ "$use_dhcp" = "True" ]]; then
     # Acquire ip address and assign it to the "br0" bridge/interface
     command="sudo dhclient $ovs_bridge"
+    echo "executing: [$command]..."
+    $command
+  else
+    command="sudo ip addr add $wired_iface_ip/24 dev $ovs_bridge"
     echo "executing: [$command]..."
     $command
   fi
