@@ -19,6 +19,9 @@ wired_iface=enp0s3
 # The IP address assigned (by the DHCP server) to the host's wired interface (host specific)
 wired_iface_ip=192.168.1.157
 
+# The local network gatway IP address (relevant when using static IP addressing)
+gateway_ip=192.168.1.1
+
 # The name of the OVS bridge to create (it can be anything)
 ovs_bridge=br0
 
@@ -120,6 +123,7 @@ ovs_show_menu()
   echo "Using DHCP for host's IP:        [$use_dhcp]"
   echo "Network interface:               [$wired_iface]"
   echo "Network interface IP address:    [$wired_iface_ip]"
+  echo "Default gateway IP address:      [$gateway_ip]"
   echo "Default bridge name:             [$ovs_bridge]"
   echo "Number of VMs in testbed:        [$number_of_vms]"
   echo "VM base name:                    [$vm_base_name]"
@@ -461,7 +465,13 @@ ovs_deploy_network()
     echo "executing: [$command]..."
     $command
   else
+    # Add (move) the wired interface ip address to the bridge interface
     command="sudo ip addr add $wired_iface_ip/24 dev $ovs_bridge"
+    echo "executing: [$command]..."
+    $command
+
+    # Add static route to allow access to hosts outside the local subnet
+    command="sudo route add default gw $gateway_ip $ovs_bridge"
     echo "executing: [$command]..."
     $command
   fi
@@ -1347,6 +1357,21 @@ ovs_purge_network()
     # Acquire ip address and assign it to the physical wired interface
     command="sudo dhclient $wired_iface"
     echo "Executing: [$command]"
+    $command    
+  else
+    # Remove static route
+    command="sudo route del default"
+    echo "executing: [$command]..."
+    $command
+
+    # Restore IP address to wired interface
+    command="sudo ip addr add $wired_iface_ip/24 dev $wired_iface"
+    echo "executing: [$command]..."
+    $command
+
+    # Add static route to allow access to hosts outside the local subnet
+    command="sudo route add default gw $gateway_ip $wired_iface"
+    echo "executing: [$command]..."
     $command    
   fi
 }
