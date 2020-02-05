@@ -14,10 +14,10 @@ TEXT_VIEW_NORMAL_ORANGE="\e[209m"
 TEXT_VIEW_NORMAL='\e[00m'
 
 # The name of the physical wired interface (host specific)
-wired_iface=enp0s3
+wired_iface=eno1
 
 # The IP address assigned (by the DHCP server) to the host's wired interface (host specific)
-wired_iface_ip=192.168.1.157
+wired_iface_ip=192.168.1.166
 
 # The local network gatway IP address (relevant when using static IP addressing)
 gateway_ip=192.168.1.1
@@ -26,11 +26,11 @@ gateway_ip=192.168.1.1
 ovs_bridge=br0
 
 # The number of VMs (and interfaces we are going to configure)
-number_of_interfaces=6
+number_of_interfaces=1
 
 # Default port name. Once generated, you will have something like:
 # tap_port1, tap_port2, ... (depends on "number_of_interfaces").
-port_name_base="tap_port"
+port_name_base="vnet"
 
 # VirtualBox looks at this as the network name
 network_name=$port_name_base
@@ -46,7 +46,7 @@ vm_base_name="vm-debian9-net-node"
 
 # This determines if we are going to use DHCP or static IP address for the host.
 # Node: the guests can use either (but are configured for static ip).
-use_dhcp="True"
+use_dhcp="False"
 
 # Traffic shaping specific definitions
 
@@ -64,22 +64,35 @@ global_qos_queues_list=""
 # We are going to use an array to "partition" the qos queue types numbering.
 # This needs to be modified when support for new qos types is added to this
 # script. This is a global definition used by misc. functions.
-declare -A map_qos_type_queue_number_partition
-map_qos_type_queue_number_partition["linux-htb.max-rate"]=100
-map_qos_type_queue_number_partition["linux-netem.latency"]=200
-map_qos_type_queue_number_partition["linux-netem.loss"]=300
+declare -A map_qos_type_params_partition
+map_qos_type_params_partition["linux-htb.max-rate"]=100
+map_qos_type_params_partition["linux-netem.latency"]=200
+map_qos_type_params_partition["linux-netem.loss"]=300
 
-# Gloabal...
+# Gloabal parameters related to qos (ovs internal) configuration
 g_qos_queue_number=0
+g_qos_ofport_request=0
 g_qos_queue_record_uuid=""
 
 # This flag should normally be set to true (because we want to start the VMs in out network). But
 # just in case (for some reason) we do not want to start the VMs immediately after configuring the 
 # network, we can manage that here.
-g_start_vms_upon_network_provisioning=true
+g_start_vms_upon_network_provisioning=false
+
+g_attach_vms_to_network=false
+
 
 # Capture time when file was sourced 
 g_sourced_datetime="$(date +%c)"
+
+# Some KVM defaults for debian VM
+kvm_default_ram="1024"
+kvm_default_size="20"
+
+# Network related definitions (update according to local environment)
+kvm_ovs_network_name="kvm-ovs-network"
+kvm_ovs_network_definitions_path="/home/rolaya/proj/ovs/fork/base/ovs"
+kvm_ovs_network_definition_file="kvm-ovs-network.xml"
 
 #==================================================================================================================
 #
@@ -125,6 +138,7 @@ ovs_show_menu()
   echo "Network interface IP address:    [$wired_iface_ip]"
   echo "Default gateway IP address:      [$gateway_ip]"
   echo "Default bridge name:             [$ovs_bridge]"
+  echo "Default tap port interface name: [$port_name_base]"
   echo "Number of VMs in testbed:        [$number_of_vms]"
   echo "VM base name:                    [$vm_base_name]"
   echo "VM range:                        [$vm_base_name$first_vm..$vm_base_name$number_of_vms]"
@@ -151,11 +165,11 @@ ovs_show_menu()
 
   ovs_show_menu_option "ovs_port_qos_packet_loss_create  " " - set port packet loss (%)"
   ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_create port_number packet_loss"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 30"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_create 1 30"
 
   ovs_show_menu_option "ovs_port_qos_latency_create      " " - set port latency (microseconds)"
   ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_latency_create port_number latency"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 500000"
+  ovs_show_menu_option "                                 " "   example: ovs_port_qos_latency_create 1 500000"
 
   ovs_show_menu_option "ovs_port_qos_max_rate_update     " " - update port bandwidth (mbps)"
   ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_update port_number bandwidth"
@@ -749,15 +763,15 @@ ovs_port_qos_htb_create()
     qos_id_format qos_id $interface $qos_type $qos_other_config
 
     # We use the number part of the interface as the openflow port request and openflow queue number
-    of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
     port_number=$(echo "$interface" | sed 's/[^0-9]*//g')
 
     # Get queue number based on qos type and port number
-    ovs_get_qos_queue_number $qos $port_number
+    ovs_setup_qos_params $qos $port_number
 
     # Update local value
     queue_number=$g_qos_queue_number
-    
+    of_port_request=$g_qos_ofport_request
+
     # qos already defined?
     if [[ "$qos_defined" = false ]]; then
 
@@ -894,14 +908,14 @@ ovs_port_qos_netem_create()
     qos_id_format qos_id $interface $qos_type $qos_other_config
 
     # We use the number part of the interface as the openflow port request and openflow queue number
-    of_port_request=$(echo "$interface" | sed 's/[^0-9]*//g')
     port_number=$(echo "$interface" | sed 's/[^0-9]*//g')
 
     # Get queue number based on qos type and port number
-    ovs_get_qos_queue_number $qos $port_number
+    ovs_setup_qos_params $qos $port_number
 
     # Update local value
     queue_number=$g_qos_queue_number
+    of_port_request=$g_qos_ofport_request
     
     # Format and execute traffic shaping command (creates and initializes a single 
     # qos and queue table record). This command returns a uuid for each of the records
@@ -1279,7 +1293,7 @@ ovs_port_qos_max_rate_update()
   # Insure uuid and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-    ovs_get_qos_queue_number "$qos_type.$other_config" $port_number
+    ovs_setup_qos_params "$qos_type.$other_config" $port_number
     queue_number=$g_qos_queue_number
     
     # Get qos queue record uuid.
@@ -1523,9 +1537,11 @@ deploy_network()
   # Deploy network
   ovs_deploy_network
   
-  # "Attach" VM's network interface to bridge ports
-  vms_set_network_interface
-  
+  if [[ "$g_attach_vms_to_network" = true ]]; then
+    # "Attach" VM's network interface to bridge ports
+    vms_set_network_interface
+  fi
+
   if [[ "$g_start_vms_upon_network_provisioning" = true ]]; then
     # Start all VMs in the testbed
     vms_start
@@ -2115,32 +2131,38 @@ ovs_port_find_qos_queue_record()
 
 #==================================================================================================================
 #==================================================================================================================
-ovs_get_qos_queue_number()
+ovs_setup_qos_params()
 {
   local qos_type=$1
   local port_number=$2
+  local partition_number=0
   local queue_number=0
+  local ofport_request=0
   local port_name=""
 
   # Initialize global, if the qos type is properly provided we will generate
-  # a valid qos queue number.
+  # a valid qos queue number and ofport request number
   g_qos_queue_number=0
-
+  g_qos_ofport_request=0
+  
   # Format the port name (something like tap_port1)
   port_name="$port_name_base$port_number"
 
   # The queue number will be the base partition+port number (e.g. for
   # "linux-htb.max-rate" and port number 1, it will be 101).
-  queue_number=${map_qos_type_queue_number_partition["$qos_type"]}
+  partition_number=${map_qos_type_params_partition["$qos_type"]}
 
   # QoS type valid?
-  if [[ "$queue_number" -gt "0" ]]; then
+  if [[ "$partition_number" -gt "0" ]]; then
 
     # Update global qos queue number
-    queue_number=$(($queue_number+$port_number))
+    queue_number=$(($partition_number+$port_number))
+    ofport_request=$(($partition_number+$port_number))
     g_qos_queue_number=$queue_number
+    g_qos_ofport_request=$ofport_request
     
-    echo "Generating queue number [$g_qos_queue_number] for port: [$port_name] with qos type: [$qos_type]..."
+    echo "Generating queue number   [$g_qos_queue_number] for port: [$port_name] with qos type: [$qos_type]..."
+    echo "Generating ofport request [$g_qos_ofport_request] for port: [$port_name] with qos type: [$qos_type]..."
 
   else
     echo -e "${TEXT_VIEW_NORMAL_RED}Error: Unable to generate qos queue number for qos type: [$qos_type]${TEXT_VIEW_NORMAL}!"
@@ -2237,6 +2259,72 @@ centos_provision_ovs_build()
   echo "Executing: [$command]"
   $command  
 }
+
+#               --graphics vnc,password=tbuser,port=5910,keymap=en-us
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_install()
+{
+  local command=""
+  local kvm_ram=${1:-$kvm_default_ram}
+  local kvm_size=${2:-$kvm_default_size}
+
+  command="sudo virt-install
+               --name kvm_node1
+               --description \"VTNnode1\"
+               --os-type=Linux
+               --os-variant=debian9
+               --ram=$kvm_ram
+               --vcpus=1
+               --disk path=/var/lib/libvirt/images/kvm_node1.img,bus=virtio,size=$kvm_size
+               --network network:$kvm_ovs_network_name
+               --graphics none
+               --location /home/rolaya/iso/debian-9.11.0-amd64-netinst.iso 
+               --extra-args console=ttyS0"
+  echo "Executing: [$command]"
+  $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_start()
+{
+  local command=""
+  local vm_name="kvm_node1"
+
+  command="sudo virsh start $vm_name --console --force-boot"
+  echo "Executing: [$command]"
+  $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_ovs_network_provision()
+{
+  local command=""
+
+  command="sudo virsh net-define $kvm_ovs_network_definitions_path/$kvm_ovs_network_definition_file"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo virsh net-start $kvm_ovs_network_name"
+  echo "Executing: [$command]"
+  $command  
+  
+  command="sudo virsh net-autostart $kvm_ovs_network_name"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo virsh net-list"
+  echo "Executing: [$command]"
+  $command  
+}
+
+
 
 # Display ovs helper "menu"
 ovs_show_menu
