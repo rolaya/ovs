@@ -13,36 +13,12 @@ TEXT_VIEW_NORMAL_PURPLE="\e[177m"
 TEXT_VIEW_NORMAL_ORANGE="\e[209m"
 TEXT_VIEW_NORMAL='\e[00m'
 
-# The name of the physical wired interface (host specific)
-wired_iface=eno1
-
-# The IP address assigned (by the DHCP server) to the host's wired interface (host specific)
-wired_iface_ip=192.168.1.166
-
-# The local network gatway IP address (relevant when using static IP addressing)
-gateway_ip=192.168.1.1
-
-# The name of the OVS bridge to create (it can be anything)
-ovs_bridge=br0
-
-# The number of VMs (and interfaces we are going to configure)
-number_of_interfaces=1
-
-# Default port name. Once generated, you will have something like:
-# tap_port1, tap_port2, ... (depends on "number_of_interfaces").
-port_name_base="vnet"
+# The global configuration file. Modify as per host and VNT
+# requirements
+g_config_file="config.env"
 
 # VirtualBox looks at this as the network name
-network_name=$port_name_base
-
-# For clarity, use number of VMs variable (it is the same as the number of ports/interfaces)
-number_of_vms=$number_of_interfaces
-
-# VM base name. The VMs names are something like "vm-debian9-net-node1".
-# At presend, these VMs are "manually" generated. The "vm_base_name" must be manually changed
-# here according to your local configuration (i.e. based on how the VMs in the testbed were
-# named. It is assumed VMs are sequentially named).
-vm_base_name="vm-debian9-net-node"
+network_name=$OVS_PORT_NAME_BASE
 
 # This determines if we are going to use DHCP or static IP address for the host.
 # Node: the guests can use either (but are configured for static ip).
@@ -115,10 +91,10 @@ ovs_show_menu()
   local first_vm="1"
 
   # Initialize misc. for display to user
-  port_name_sample=$port_name_base
+  port_name_sample=$OVS_PORT_NAME_BASE
   port_name_sample+="1"
 
-  vm_name_sample=$vm_base_name
+  vm_name_sample=$VM_BASE_NAME
   vm_name_sample+="1"
 
   # Environment 
@@ -130,19 +106,20 @@ ovs_show_menu()
   # Get date/time (useful for keeping track of changes)
   datetime="$(date +%c)"
 
+  echo "Configuration file:              [$g_config_file]"
   echo "Host name:                       [$HOSTNAME]"
   echo "Sourced time:                    [$g_sourced_datetime]"
   echo "Current time:                    [$datetime]"
   echo "Using DHCP for host's IP:        [$use_dhcp]"
-  echo "Network interface:               [$wired_iface]"
-  echo "Network interface IP address:    [$wired_iface_ip]"
-  echo "Default gateway IP address:      [$gateway_ip]"
-  echo "Default bridge name:             [$ovs_bridge]"
-  echo "Default tap port interface name: [$port_name_base]"
-  echo "Number of VMs in testbed:        [$number_of_vms]"
-  echo "VM base name:                    [$vm_base_name]"
-  echo "VM range:                        [$vm_base_name$first_vm..$vm_base_name$number_of_vms]"
-  echo "VM port range:                   [$port_name_base$first_vm..$port_name_base$number_of_vms]"
+  echo "Network interface:               [$HOST_NETIFACE_NAME]"
+  echo "Network interface IP address:    [$HOST_NETIFACE_IP]"
+  echo "Default gateway IP address:      [$GATEWAY_IP]"
+  echo "Default bridge name:             [$OVS_BRIDGE]"
+  echo "Default tap port interface name: [$OVS_PORT_NAME_BASE]"
+  echo "Number of VMs in testbed:        [$NUMBER_OF_VMS]"
+  echo "VM base name:                    [$VM_BASE_NAME]"
+  echo "VM range:                        [$VM_BASE_NAME$first_vm..$VM_BASE_NAME$NUMBER_OF_VMS]"
+  echo "VM port range:                   [$OVS_PORT_NAME_BASE$first_vm..$OVS_PORT_NAME_BASE$NUMBER_OF_VMS]"
   echo
 
   # Deployment
@@ -359,12 +336,12 @@ ovs_bridge_del_port()
 ovs_bridge_add_ports()
 {
   local bridge=$1
-  local port=${2:-$port_name_base}
+  local port=${2:-$OVS_PORT_NAME_BASE}
   
   echo "Adding ports to bridge $bridge..."
 
   # Create a tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
-  for ((i = 1; i <= $number_of_interfaces; i++)) do
+  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
     ovs_bridge_add_port $port$i $bridge
   done
 }
@@ -447,19 +424,19 @@ ovs_deploy_network()
   echo "Deploying testbed network..."
 
   # create new bridge named "br0"
-  command="sudo ovs-vsctl add-br $ovs_bridge"
+  command="sudo ovs-vsctl add-br $OVS_BRIDGE"
   echo "executing: [$command]..."
   $command
   
   # Activate "br0" device 
-  command="sudo ip link set $ovs_bridge up"
+  command="sudo ip link set $OVS_BRIDGE up"
   echo "executing: [$command]..."
   $command
 
   # Add network device "enp5s0" to "br0" bridge. Device "enp5s0" is the
   # name of the actual physical wired network interface. In some devices
   # it may be eth0.
-  command="sudo ovs-vsctl add-port $ovs_bridge $wired_iface"
+  command="sudo ovs-vsctl add-port $OVS_BRIDGE $HOST_NETIFACE_NAME"
   echo "executing: [$command]..."
   $command
   
@@ -468,30 +445,30 @@ ovs_deploy_network()
   # For simplicity, I configured my verizon router to always assign this
   # ip address (192.168.1.206) to "this" host (i.e. the host where I am 
   # deploying ovs).
-  command="sudo ip addr del $wired_iface_ip/24 dev $wired_iface"
+  command="sudo ip addr del $HOST_NETIFACE_IP/24 dev $HOST_NETIFACE_NAME"
   echo "executing: [$command]..."
   $command
 
   # Using DHCP?
   if [[ "$use_dhcp" = "True" ]]; then
     # Acquire ip address and assign it to the "br0" bridge/interface
-    command="sudo dhclient $ovs_bridge"
+    command="sudo dhclient $OVS_BRIDGE"
     echo "executing: [$command]..."
     $command
   else
     # Add (move) the wired interface ip address to the bridge interface
-    command="sudo ip addr add $wired_iface_ip/24 dev $ovs_bridge"
+    command="sudo ip addr add $HOST_NETIFACE_IP/24 dev $OVS_BRIDGE"
     echo "executing: [$command]..."
     $command
 
     # Add static route to allow access to hosts outside the local subnet
-    command="sudo route add default gw $gateway_ip $ovs_bridge"
+    command="sudo route add default gw $GATEWAY_IP $OVS_BRIDGE"
     echo "executing: [$command]..."
     $command
   fi
 
   # Create tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
-  command="ovs_bridge_add_ports $ovs_bridge"
+  command="ovs_bridge_add_ports $OVS_BRIDGE"
   echo "executing: [$command]..."
   $command
 }
@@ -501,7 +478,7 @@ ovs_deploy_network()
 #==================================================================================================================
 ovs_purge_network_deployment()
 {
-  local port=${2:-$port_name_base}
+  local port=${2:-$OVS_PORT_NAME_BASE}
 
   # Update path with ovs scripts path.
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
@@ -509,11 +486,11 @@ ovs_purge_network_deployment()
   # "Manually" delete port/interfaces and bridge created via "ovs_deploy_network"
   # Note: it is possible to purge all bridge, etc configuration when starting
   # daemons via command line options (need to try this...).
-  for ((i = 1; i <= $number_of_interfaces; i++)) do
+  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
     sudo ovs-vsctl del-port $port$1
   done
   
-  sudo ovs-vsctl del-br $ovs_bridge
+  sudo ovs-vsctl del-br $OVS_BRIDGE
 }
 
 #==================================================================================================================
@@ -543,7 +520,7 @@ ovs_traffic_shape()
   command="sudo ovs-vsctl -- \
   set interface tap_port1 ofport_request=5 -- \
   set interface tap_port2 ofport_request=6 -- \
-  set port $wired_iface qos=@newqos -- \
+  set port $HOST_NETIFACE_NAME qos=@newqos -- \
   --id=@newqos create qos type=linux-htb \
       other-config:max-rate=1000000000 \
       queues:123=@tap_port1_queue \
@@ -563,11 +540,11 @@ ovs_configure_traffic_flows()
 
   # Use OpenFlow to direct packets from tap_port1, tap_port2 to their respective 
   # (traffic shaping) queues (reserved for them in "ovs_traffic_shape").
-  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=5,actions=set_queue:123,normal"
+  command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=5,actions=set_queue:123,normal"
   echo "excuting: [$command]"
   $command
 
-  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=6,actions=set_queue:234,normal"
+  command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=6,actions=set_queue:234,normal"
   echo "excuting: [$command]"
   $command
 }
@@ -586,7 +563,7 @@ ovs_vm_set_qos()
   # this VM.
   command="sudo ovs-vsctl -- \
   set interface tap_port3 ofport_request=7 -- \
-  set port $wired_iface qos=@newqos1 -- \
+  set port $HOST_NETIFACE_NAME qos=@newqos1 -- \
   --id=@newqos1 create qos type=linux-htb \
       other-config:max-rate=1000000000 \
       queues:122=@tap_port3_queue -- \
@@ -594,7 +571,7 @@ ovs_vm_set_qos()
   echo "excuting: [$command]"
   $command
   
-  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
+  command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=7,actions=set_queue:122,normal"
   echo "excuting: [$command]"
   $command  
 }
@@ -614,7 +591,7 @@ qos_id_format()
   # record is identified by the record's uuid (something like:
   # bdc3fe06-edcc-419b-80bd-d523a0628aa2).
   temp="qos_id"
-  temp+="_$wired_iface"
+  temp+="_$HOST_NETIFACE_NAME"
   temp+="_$interface"
   temp+="_$qos_type"
   temp+="_$qos_other_config"
@@ -632,7 +609,7 @@ ovs_port_qos_latency_create()
   local qos_other_config=""
   local qos_other_config_value=$2
 
-  port_name="$port_name_base$port_number"
+  port_name="$OVS_PORT_NAME_BASE$port_number"
   qos_type="linux-netem"
   qos_other_config="latency"
   
@@ -651,7 +628,7 @@ ovs_port_qos_packet_loss_create()
   local qos_other_config=""
   local qos_other_config_value=$2
 
-  port_name="$port_name_base$port_number"
+  port_name="$OVS_PORT_NAME_BASE$port_number"
   qos_type="linux-netem"
   qos_other_config="loss"
   
@@ -677,7 +654,7 @@ ovs_port_qos_max_rate_create()
   local qos_other_config_value=$2
 
   # Format the port name based on the port base name and port number (something like tab_port1)
-  port_name="$port_name_base$port_number"
+  port_name="$OVS_PORT_NAME_BASE$port_number"
   qos_type="linux-htb"
   qos_other_config="max-rate"
   
@@ -733,7 +710,7 @@ ovs_port_qos_htb_create()
 
     # When qos is linux-htm max-rate, the qos configuration includes the physical interface.
     # (Need to understand this better (see ovs documentation in web)).
-    port_name=$wired_iface
+    port_name=$HOST_NETIFACE_NAME
 
     # Find record in "port" table whose "name" is enp5s0 (the name of our wired ethernet interface).
     table="port"
@@ -810,7 +787,7 @@ ovs_port_qos_htb_create()
       linux_htb_queue_record_uuid="${uuid_array[1]}"
 
       # Format and execute flow command (creates and initializes new record in Queue table)
-      command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
+      command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=$of_port_request,actions=set_queue:$queue_number,normal"
       echo "excuting: [$command]"
       $command
 
@@ -833,8 +810,8 @@ ovs_port_qos_htb_create()
     fi
 
     echo "Created QoS configuration:"
-    echo "bridge:              [$ovs_bridge]"
-    echo "port:                [$wired_iface]"
+    echo "bridge:              [$OVS_BRIDGE]"
+    echo "port:                [$HOST_NETIFACE_NAME]"
     echo "interface:           [$interface]"
     echo "type:                [$qos_type]"
     echo "other config:        [$qos_other_config]"
@@ -950,13 +927,13 @@ ovs_port_qos_netem_create()
     linux_htb_queue_record_uuid="${uuid_array[1]}"
 
     # Format and execute flow command (creates and initializes new record in Queue table)
-    command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$of_port_request,actions=set_queue:$queue_number,normal"
+    command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=$of_port_request,actions=set_queue:$queue_number,normal"
     echo "excuting: [$command]"
     $command
 
     echo "Created QoS configuration:"
-    echo "bridge:              [$ovs_bridge]"
-    echo "port:                [$wired_iface]"
+    echo "bridge:              [$OVS_BRIDGE]"
+    echo "port:                [$HOST_NETIFACE_NAME]"
     echo "interface:           [$interface]"
     echo "type:                [$qos_type]"
     echo "other config:        [$qos_other_config]"
@@ -1032,9 +1009,9 @@ ovs_port_qos_netem_purge()
   local port_number=
   local port_name=""
 
-  for ((i = $number_of_interfaces; i > 0; i--)) do
+  for ((i = $NUMBER_OF_VMS; i > 0; i--)) do
 
-    port_name="$port_name_base$i"
+    port_name="$OVS_PORT_NAME_BASE$i"
 
     # Delete tap port tap_portx from ovs bridge
     ovs_port_qos_netem_delete $port_name
@@ -1183,7 +1160,7 @@ ovs_port_qos_latency_update()
 
   # Update QoS max rate.
 
-  port_name="$port_name_base$port_number"
+  port_name="$OVS_PORT_NAME_BASE$port_number"
 
   echo "Update port qos:"
   echo "port number: [$table]"
@@ -1194,7 +1171,7 @@ ovs_port_qos_latency_update()
   if [[ $# -eq 2 ]]; then
 
     # Format port name
-    port_name="$port_name_base$port_number"
+    port_name="$OVS_PORT_NAME_BASE$port_number"
 
     # Delete qos entry
     ovs_port_qos_netem_delete $port_name
@@ -1235,7 +1212,7 @@ ovs_port_qos_packet_loss_update()
 
   # Update QoS max rate.
 
-  port_name="$port_name_base$port_number"
+  port_name="$OVS_PORT_NAME_BASE$port_number"
 
   echo "Update port qos:"
   echo "port number: [$table]"
@@ -1246,7 +1223,7 @@ ovs_port_qos_packet_loss_update()
   if [[ $# -eq 2 ]]; then
 
     # Format port name
-    port_name="$port_name_base$port_number"
+    port_name="$OVS_PORT_NAME_BASE$port_number"
 
     # Delete qos entry
     ovs_port_qos_netem_delete $port_name
@@ -1314,13 +1291,13 @@ ovs_port_qos_max_rate_update()
 ovs_bridge_del_ports()
 {
   local bridge=$1
-  local port=${2:-$port_name_base}
+  local port=${2:-$OVS_PORT_NAME_BASE}
 
   # These commands are executed as "root" user (for now)
   
-  echo "Purging $number_of_interfaces ports from $bridge bridge..."
+  echo "Purging $NUMBER_OF_VMS ports from $bridge bridge..."
 
-  for ((i = $number_of_interfaces; i > 0; i--)) do
+  for ((i = $NUMBER_OF_VMS; i > 0; i--)) do
 
     # Delete tap port tap_portx from ovs bridge
     ovs_bridge_del_port $port$i $bridge
@@ -1343,33 +1320,33 @@ ovs_purge_network()
   export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # Remote ports from bridge
-  command="ovs_bridge_del_ports $ovs_bridge"
+  command="ovs_bridge_del_ports $OVS_BRIDGE"
   echo "Executing: [$command]"
   $command
 
   # Delete physical wired port from ovs bridge
-  command="sudo ovs-vsctl del-port $ovs_bridge $wired_iface"
+  command="sudo ovs-vsctl del-port $OVS_BRIDGE $HOST_NETIFACE_NAME"
   echo "Executing: [$command]"
   $command
 
   # Deactivate "br0" device 
-  command="sudo ip link set $ovs_bridge down"
+  command="sudo ip link set $OVS_BRIDGE down"
   echo "Executing: [$command]"
   $command
 
   # Delete bridge named "br0" from ovs
-  command="sudo ovs-vsctl del-br $ovs_bridge"
+  command="sudo ovs-vsctl del-br $OVS_BRIDGE"
   echo "Executing: [$command]"
   $command
 
   # Bring up physical wired interface
-  command="sudo ip link set $wired_iface up"
+  command="sudo ip link set $HOST_NETIFACE_NAME up"
   echo "Executing: [$command]"
   $command
 
   if [[ "$use_dhcp" = "True" ]]; then
     # Acquire ip address and assign it to the physical wired interface
-    command="sudo dhclient $wired_iface"
+    command="sudo dhclient $HOST_NETIFACE_NAME"
     echo "Executing: [$command]"
     $command    
   else
@@ -1379,12 +1356,12 @@ ovs_purge_network()
     $command
 
     # Restore IP address to wired interface
-    command="sudo ip addr add $wired_iface_ip/24 dev $wired_iface"
+    command="sudo ip addr add $HOST_NETIFACE_IP/24 dev $HOST_NETIFACE_NAME"
     echo "executing: [$command]..."
     $command
 
     # Add static route to allow access to hosts outside the local subnet
-    command="sudo route add default gw $gateway_ip $wired_iface"
+    command="sudo route add default gw $GATEWAY_IP $HOST_NETIFACE_NAME"
     echo "executing: [$command]..."
     $command    
   fi
@@ -1482,10 +1459,10 @@ vms_set_network_interface()
 
   echo "Setting NIC \"network\" configuration for all VMs in the network..."
 
-  for ((i = 1; i <= $number_of_vms; i++)) do
+  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
 
     # Set VM network configuration
-    vm_set_network_interface $vm_base_name$i "1" $network_name$i
+    vm_set_network_interface $VM_BASE_NAME$i "1" $network_name$i
 
   done
 }
@@ -1500,13 +1477,13 @@ vm_deploy()
   local port=""
   
   # Configure the vm name and the port name the vm will use.
-  local vm_name="$vm_base_name$vm_number"
+  local vm_name="$VM_BASE_NAME$vm_number"
   local port="$network_name$vm_number"
 
-  echo "Attaching VM: [$vm_name] to bridge: [$ovs_bridge], port: [$port]..."
+  echo "Attaching VM: [$vm_name] to bridge: [$OVS_BRIDGE], port: [$port]..."
 
   # Add port to bridge
-  ovs_bridge_add_port $port $ovs_bridge
+  ovs_bridge_add_port $port $OVS_BRIDGE
 
   # "Attach" VM's network interface to bridge ports
   vm_set_network_interface $vm_name "1" $port
@@ -1546,7 +1523,7 @@ deploy_network()
     # Start all VMs in the testbed
     vms_start
   else
-    msg="Warning [$number_of_interfaces] VM(s) not started as per configuration!!!"
+    msg="Warning [$NUMBER_OF_VMS] VM(s) not started as per configuration!!!"
     show_warning_msg "$msg"
   fi
 
@@ -1562,7 +1539,7 @@ qos_initialize()
   echo "Configuring QoS..."
   echo "Initializing QoS max-rate..."
 
-  for ((i = 1; i <= $number_of_vms; i++)) do
+  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
 
     # Create QoS record (defaulting to max ethernet rate on each port)
     ovs_port_qos_max_rate_create "$i" $qos_default_max_rate
@@ -1607,10 +1584,10 @@ vms_start()
 
   echo "Launching all VMs in the network..."
 
-  for ((i = 1; i <= $number_of_vms; i++)) do
+  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
 
     # Start VM
-    vm_start $vm_base_name$i
+    vm_start $VM_BASE_NAME$i
 
   done
 }
@@ -1625,10 +1602,10 @@ vms_stop()
 
   echo "Powering off all VMs in the network..."
 
-  for ((i = 1; i <= $number_of_vms; i++)) do
+  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
 
     # Power off VM
-    vm_stop $vm_base_name$i
+    vm_stop $VM_BASE_NAME$i
 
   done
 }
@@ -1793,7 +1770,7 @@ ovs_interface_configure_flow()
   local in_port=$1
   local queue=$2
 
-  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=$in_port,actions=set_queue:$queue,normal"
+  command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=$in_port,actions=set_queue:$queue,normal"
   echo "Executing: [$command]"
   $command
 }
@@ -2070,7 +2047,7 @@ ovs_port_find_qos_queue_record()
 
   # Find record in "port" table whose "name" is enp5s0 (the name of our wired ethernet interface).
   table="port"
-  condition="name=$wired_iface"
+  condition="name=$HOST_NETIFACE_NAME"
   ovs_table_find_record $table "$condition" uuid
 
   # Get qos uuid associated with port
@@ -2146,7 +2123,7 @@ ovs_setup_qos_params()
   g_qos_ofport_request=0
   
   # Format the port name (something like tap_port1)
-  port_name="$port_name_base$port_number"
+  port_name="$OVS_PORT_NAME_BASE$port_number"
 
   # The queue number will be the base partition+port number (e.g. for
   # "linux-htb.max-rate" and port number 1, it will be 101).
@@ -2193,7 +2170,7 @@ qos_set_latency()
   echo "Executing: [$command]"
   $command 
 
-  command="sudo ovs-ofctl add-flow $ovs_bridge in_port=7,actions=set_queue:122,normal"
+  command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=7,actions=set_queue:122,normal"
   echo "Executing: [$command]"
   $command   
 }
@@ -2324,7 +2301,19 @@ kvm_ovs_network_provision()
   $command  
 }
 
+#==================================================================================================================
+#
+#=================================================================================================================
+function provision_environment()
+{
+  echo "Sourcing configuration file: [$g_config_file]"
 
+  # Source host and environment specific VNT configuration
+  source "$g_config_file"
+}
+
+# Provision environment based on configuration file
+provision_environment
 
 # Display ovs helper "menu"
 ovs_show_menu
