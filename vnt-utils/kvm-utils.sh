@@ -6,8 +6,10 @@ source "ui-utils.sh"
 # The global configuration file for CentOS VNT VM
 g_kvm_vnt_vm_config_file="config.env.kvm_vnt_vm"
 
-#               --graphics vnc,password=tbuser,port=5910,keymap=en-us
-
+# Network related definitions (update according to local environment)
+kvm_ovs_network_name="kvm-ovs-network"
+kvm_ovs_network_definitions_path="/home/rolaya/proj/ovs/fork/base/ovs"
+kvm_ovs_network_definition_file="kvm-ovs-network.xml"
 
 #==================================================================================================================
 #
@@ -41,9 +43,9 @@ kvm_utils_show_menu()
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
   show_menu_option "kvm_vnt_vm_install            " " - Install KVM VNT VM"
-  show_menu_option "kvm_vnt_vm_purge              " " - Purge KVM VNT VM"
-  show_menu_option "kvm_vnt_vm_snapshot_create    " " - Create KVM VNT VM snapshot"
-  show_menu_option "kvm_vnt_vm_start              " " - Start KVM VNT VM"
+  show_menu_option "kvm_vnt_vm_purge              " " - \"$KVM_VNT_VM_NAME\" VM purge"
+  show_menu_option "kvm_vnt_vm_snapshot_create    " " - \"$KVM_VNT_VM_NAME\" VM snapshot create"
+  show_menu_option "kvm_vnt_vm_start              " " - \"$KVM_VNT_VM_NAME\" VM start"
 }
 
 #==================================================================================================================
@@ -104,7 +106,7 @@ kvm_vnt_vm_install()
                --name $KVM_VNT_VM_NAME
                --os-type=Linux
                --os-variant=centos7.0
-               --network bridge=virbr0
+               --network bridge=br0-wired
                --ram=$KVM_VNT_VM_RAM
                --vcpus=1
                --disk path=$KVM_LIBVIRT_IMAGES_PATH/$KVM_VNT_VM_NAME.img,bus=virtio,size=$KVM_VNT_VM_SIZE
@@ -113,6 +115,78 @@ kvm_vnt_vm_install()
                --extra-args console=ttyS0"
   echo "Executing: [$command]"
   $command                 
+}
+
+#==================================================================================================================
+# Installs "main" CentOS VM on a KVM based hypervisor.
+#==================================================================================================================
+kvm_vm_install()
+{
+  local command=""
+  local vn_name=${1:-"vm_name_is_required"}
+
+  command="sudo virt-install
+               --name $vn_name
+               --os-type=Linux
+               --os-variant=centos7.0
+               --network bridge=br0-wired
+               --ram=$KVM_VNT_VM_RAM
+               --vcpus=1
+               --disk path=$KVM_LIBVIRT_IMAGES_PATH/$vn_name.img,bus=virtio,size=$KVM_VNT_VM_SIZE
+               --graphics $KVM_INSTALL_OPTION_GRAPHICS
+               --location /home/rolaya/iso/CentOS-7-x86_64-DVD-1908.iso
+               --extra-args console=ttyS0"
+  echo "Executing: [$command]"
+  $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_vnt_node_install()
+{
+  local command=""
+  local kvm_ram=${1:-$kvm_default_ram}
+  local kvm_size=${2:-$kvm_default_size}
+
+  command="sudo virt-install
+               --name kvm_node1
+               --description \"VTNnode1\"
+               --os-type=Linux
+               --os-variant=debian9
+               --ram=$kvm_ram
+               --vcpus=1
+               --disk path=/var/lib/libvirt/images/kvm_node1.img,bus=virtio,size=$kvm_size
+               --network network:$kvm_ovs_network_name
+               --graphics none
+               --location /home/rolaya/iso/debian-9.11.0-amd64-netinst.iso 
+               --extra-args console=ttyS0"
+  echo "Executing: [$command]"
+  $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_ovs_network_provision()
+{
+  local command=""
+
+  command="sudo virsh net-define $kvm_ovs_network_definitions_path/$kvm_ovs_network_definition_file"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo virsh net-start $kvm_ovs_network_name"
+  echo "Executing: [$command]"
+  $command  
+  
+  command="sudo virsh net-autostart $kvm_ovs_network_name"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo virsh net-list"
+  echo "Executing: [$command]"
+  $command  
 }
 
 #==================================================================================================================

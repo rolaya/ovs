@@ -29,9 +29,12 @@ centos_describe_provisioning()
   echo "KVM VNT VM name:                 [$KVM_VNT_VM_NAME]"
   echo
 
-  show_config_section "System"
+  show_config_section "General system configuration"
 
+  nfs_show_config_item "update /etc/hosts as required to access hosts in local network by name (sudo required)"
   nfs_show_config_item "sudo yum update"
+  nfs_show_config_item "sudo yum group install \"Virtualization Host\""
+  nfs_show_config_item "sudo yum install git"
 }
 
 #==================================================================================================================

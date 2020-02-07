@@ -57,11 +57,6 @@ g_sourced_datetime="$(date +%c)"
 kvm_default_ram="1024"
 kvm_default_size="20"
 
-# Network related definitions (update according to local environment)
-kvm_ovs_network_name="kvm-ovs-network"
-kvm_ovs_network_definitions_path="/home/rolaya/proj/ovs/fork/base/ovs"
-kvm_ovs_network_definition_file="kvm-ovs-network.xml"
-
 #==================================================================================================================
 #
 #==================================================================================================================
@@ -2215,70 +2210,6 @@ centos_provision_ovs_build()
   $command  
 
   command="sudo yum install python-devel openssl-devel kernel-devel kernel-debug-devel"
-  echo "Executing: [$command]"
-  $command  
-}
-
-#               --graphics vnc,password=tbuser,port=5910,keymap=en-us
-
-#==================================================================================================================
-#
-#==================================================================================================================
-kvm_install()
-{
-  local command=""
-  local kvm_ram=${1:-$kvm_default_ram}
-  local kvm_size=${2:-$kvm_default_size}
-
-  command="sudo virt-install
-               --name kvm_node1
-               --description \"VTNnode1\"
-               --os-type=Linux
-               --os-variant=debian9
-               --ram=$kvm_ram
-               --vcpus=1
-               --disk path=/var/lib/libvirt/images/kvm_node1.img,bus=virtio,size=$kvm_size
-               --network network:$kvm_ovs_network_name
-               --graphics none
-               --location /home/rolaya/iso/debian-9.11.0-amd64-netinst.iso 
-               --extra-args console=ttyS0"
-  echo "Executing: [$command]"
-  $command                 
-}
-
-#==================================================================================================================
-#
-#==================================================================================================================
-kvm_start()
-{
-  local command=""
-  local vm_name="kvm_node1"
-
-  command="sudo virsh start $vm_name --console --force-boot"
-  echo "Executing: [$command]"
-  $command                 
-}
-
-#==================================================================================================================
-#
-#==================================================================================================================
-kvm_ovs_network_provision()
-{
-  local command=""
-
-  command="sudo virsh net-define $kvm_ovs_network_definitions_path/$kvm_ovs_network_definition_file"
-  echo "Executing: [$command]"
-  $command  
-
-  command="sudo virsh net-start $kvm_ovs_network_name"
-  echo "Executing: [$command]"
-  $command  
-  
-  command="sudo virsh net-autostart $kvm_ovs_network_name"
-  echo "Executing: [$command]"
-  $command  
-
-  command="sudo virsh net-list"
   echo "Executing: [$command]"
   $command  
 }
