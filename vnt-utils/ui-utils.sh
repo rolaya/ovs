@@ -11,14 +11,54 @@ TEXT_VIEW_NORMAL_PURPLE="\e[177m"
 TEXT_VIEW_NORMAL_ORANGE="\e[209m"
 TEXT_VIEW_NORMAL='\e[00m'
 
+g_config_item_number=1
+g_config_section_number=1
+
 #==================================================================================================================
 #
 #==================================================================================================================
-ovs_show_menu_option()
+show_menu_option()
 {
   local command_name=$1
   local command_description=$2
   echo -e "${TEXT_VIEW_NORMAL_BLUE}$command_name${TEXT_VIEW_NORMAL} $command_description"
 }
+
+#==================================================================================================================
+#
+#==================================================================================================================
+show_config_section()
+{
+  local config_item=$1
+  
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}$g_config_section_number. $config_item${TEXT_VIEW_NORMAL}"
+
+  # Increment item index
+  ((g_config_section_number++))
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+nfs_show_config_item()
+{
+  local config_item=$1
+  
+  echo -e "${TEXT_VIEW_NORMAL_BLUE}  $g_config_item_number. $config_item${TEXT_VIEW_NORMAL}"
+
+  # Increment item index
+  ((g_config_item_number++))
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+nfs_show_note()
+{
+  local config_item=$1
+  
+  echo -e "${TEXT_VIEW_NORMAL_BLUE}  $config_item${TEXT_VIEW_NORMAL}"
+}
+
 
 

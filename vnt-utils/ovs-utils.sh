@@ -109,8 +109,8 @@ ovs_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}Deployment"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  ovs_show_menu_option "ovs_start                        " " - Start OVS daemons (must be executed as root)"
-  ovs_show_menu_option "deploy_network                   " " - Deploy network configuration and launch VMs"
+  show_menu_option "ovs_start                        " " - Start OVS daemons (must be executed as root)"
+  show_menu_option "deploy_network                   " " - Deploy network configuration and launch VMs"
   echo
 
    # Traffic shaping
@@ -118,29 +118,29 @@ ovs_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}Traffic shaping"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  ovs_show_menu_option "ovs_port_qos_max_rate_create     " " - set port bandwidth (mbps)"
-  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_create port_number bandwidth"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 1000000"
+  show_menu_option "ovs_port_qos_max_rate_create     " " - set port bandwidth (mbps)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_create port_number bandwidth"
+  show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 1000000"
 
-  ovs_show_menu_option "ovs_port_qos_packet_loss_create  " " - set port packet loss (%)"
-  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_create port_number packet_loss"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_create 1 30"
+  show_menu_option "ovs_port_qos_packet_loss_create  " " - set port packet loss (%)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_create port_number packet_loss"
+  show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_create 1 30"
 
-  ovs_show_menu_option "ovs_port_qos_latency_create      " " - set port latency (microseconds)"
-  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_latency_create port_number latency"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_latency_create 1 500000"
+  show_menu_option "ovs_port_qos_latency_create      " " - set port latency (microseconds)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_latency_create port_number latency"
+  show_menu_option "                                 " "   example: ovs_port_qos_latency_create 1 500000"
 
-  ovs_show_menu_option "ovs_port_qos_max_rate_update     " " - update port bandwidth (mbps)"
-  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_update port_number bandwidth"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_max_rate_update 1 500000"
+  show_menu_option "ovs_port_qos_max_rate_update     " " - update port bandwidth (mbps)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_update port_number bandwidth"
+  show_menu_option "                                 " "   example: ovs_port_qos_max_rate_update 1 500000"
 
-  ovs_show_menu_option "ovs_port_qos_packet_loss_update  " " - update port packet loss (%)"
-  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_update port_number packet_loss"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_update 1 30"
+  show_menu_option "ovs_port_qos_packet_loss_update  " " - update port packet loss (%)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_update port_number packet_loss"
+  show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_update 1 30"
 
-  ovs_show_menu_option "ovs_port_qos_latency_update      " " - update port latency (microseconds)"
-  ovs_show_menu_option "                                 " "   usage:   ovs_port_qos_latency_update port_number latency"
-  ovs_show_menu_option "                                 " "   example: ovs_port_qos_latency_update 1 500000"
+  show_menu_option "ovs_port_qos_latency_update      " " - update port latency (microseconds)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_latency_update port_number latency"
+  show_menu_option "                                 " "   example: ovs_port_qos_latency_update 1 500000"
 
   #echo "\"ovs_bridge_add\"                    - Add bridge to system"
   #echo "\"ovs_bridge_add_ports\"              - Add ports to bridge"

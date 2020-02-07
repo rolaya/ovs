@@ -31,10 +31,10 @@ vnc_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}Deployment"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  ovs_show_menu_option "vnc_utils_show_menu                  " " - Show help"
-  ovs_show_menu_option "vnc_provision                        " " - Provision VNC server/client"
-  ovs_show_menu_option "vnc_server_provision                 " " - Provision VNC server"
-  ovs_show_menu_option "vnc_client_provision                 " " - Provision VNC client"
+  show_menu_option "vnc_utils_show_menu                  " " - Show help"
+  show_menu_option "vnc_provision                        " " - Provision VNC server/client"
+  show_menu_option "vnc_server_provision                 " " - Provision VNC server"
+  show_menu_option "vnc_client_provision                 " " - Provision VNC client"
 }
 
 #==================================================================================================================

@@ -36,7 +36,7 @@ kvm_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}Deployment"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  ovs_show_menu_option "kvm_vnt_vm_install                        " " - Install KVM VNT VM"
+  show_menu_option "kvm_vnt_vm_install                        " " - Install KVM VNT VM"
 }
 
 #==================================================================================================================
