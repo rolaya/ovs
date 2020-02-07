@@ -22,6 +22,7 @@ centos_describe_provisioning()
   # Get date/time (useful for keeping track of changes)
   datetime="$(date +%c)"
 
+  echo "Kernel version:                  [$(uname -r)]"
   echo "Configuration file:              [$g_centos_config_file]"
   echo "Host name:                       [$HOSTNAME]"
   echo "Sourced time:                    [$g_sourced_datetime]"
@@ -34,7 +35,22 @@ centos_describe_provisioning()
   nfs_show_config_item "update /etc/hosts as required to access hosts in local network by name (sudo required)"
   nfs_show_config_item "sudo yum update"
   nfs_show_config_item "sudo yum group install \"Virtualization Host\""
+  nfs_show_config_item "sudo yum group install \"Development Tools\""
   nfs_show_config_item "sudo yum install git"
+  nfs_show_config_item "sudo yum install rpm-build"
+  nfs_show_config_item "sudo yum install openssl-devel"
+  nfs_show_config_item "sudo yum install python-devel"
+  nfs_show_config_item "sudo yum install groff"
+  nfs_show_config_item "sudo yum install graphviz"
+  nfs_show_config_item "sudo yum install checkpolicy"
+  nfs_show_config_item "sudo yum install selinux-policy-devel"
+  nfs_show_config_item "sudo yum install python-twisted-core"
+  nfs_show_config_item "sudo yum install libcap-ng-devel"
+  nfs_show_config_item "sudo yum install unbound"
+  nfs_show_config_item "sudo yum install unbound-devel"
+  nfs_show_config_item "sudo yum install python-sphinx"
+  nfs_show_config_item "wget https://www.openvswitch.org/releases/openvswitch-2.12.0.tar.gz"
+  nfs_show_config_item "rpmbuild -bb --nocheck openvswitch-2.12.0/rhel/openvswitch-fedora.spec"
 }
 
 #==================================================================================================================
