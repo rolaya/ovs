@@ -1,0 +1,6 @@
+<network>
+<name>kvm-ovs-network</name>
+<forward mode='bridge'/>
+<bridge name='br0'/>
+<virtualport type='openvswitch'/>
+</network>

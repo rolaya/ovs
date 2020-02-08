@@ -27,7 +27,7 @@ centos_describe_provisioning()
   echo "Host name:                       [$HOSTNAME]"
   echo "Sourced time:                    [$g_sourced_datetime]"
   echo "Current time:                    [$datetime]"
-  echo "KVM VNT VM name:                 [$KVM_VNT_VM_NAME]"
+  echo "KVM VNT VM name:                 [$KVM_VNT_HOST_NAME]"
   echo
 
   show_config_section "General system configuration"
