@@ -42,9 +42,10 @@ kvm_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}Deployment"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "kvm_vnt_vm_install            " " - Install KVM VNT VM"
+  show_menu_option "kvm_vnt_vm_install            " " - \"$KVM_VNT_VM_NAME\" VM install"
   show_menu_option "kvm_vnt_vm_purge              " " - \"$KVM_VNT_VM_NAME\" VM purge"
   show_menu_option "kvm_vnt_vm_snapshot_create    " " - \"$KVM_VNT_VM_NAME\" VM snapshot create"
+  show_menu_option "kvm_vnt_vm_snapshot_list      " " - \"$KVM_VNT_VM_NAME\" VM snapshot list"
   show_menu_option "kvm_vnt_vm_start              " " - \"$KVM_VNT_VM_NAME\" VM start"
 }
 
@@ -79,6 +80,18 @@ kvm_vnt_vm_snapshot_create()
   fi
 
   command="sudo virsh snapshot-create-as --domain $KVM_VNT_VM_NAME --name $snapshot_name"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_vm_snapshot_list()
+{
+  local command=""
+
+  command="sudo virsh snapshot-list $KVM_VNT_VM_NAME"
   echo "Executing: [$command]"
   $command
 }
