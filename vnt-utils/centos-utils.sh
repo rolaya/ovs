@@ -51,6 +51,12 @@ centos_describe_provisioning()
   nfs_show_config_item "sudo yum install python-sphinx"
   nfs_show_config_item "wget https://www.openvswitch.org/releases/openvswitch-2.12.0.tar.gz"
   nfs_show_config_item "rpmbuild -bb --nocheck openvswitch-2.12.0/rhel/openvswitch-fedora.spec"
+  nfs_show_config_item "sudo yum install /home/rolaya/rpmbuild/RPMS/x86_64/openvswitch-2.12.0-1.el7.x86_64.rpm -y"
+  nfs_show_config_item "sudo systemctl start openvswitch.service"
+  nfs_show_config_item "sudo systemctl enable openvswitch.service"
+  nfs_show_config_item "sudo systemctl status openvswitch.service"
+  nfs_show_config_item "update /etc/sysconfig/network-scripts configuration files for OVS"
+  nfs_show_config_item "deploy_network"
 }
 
 #==================================================================================================================

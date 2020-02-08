@@ -42,14 +42,6 @@ g_qos_queue_number=0
 g_qos_ofport_request=0
 g_qos_queue_record_uuid=""
 
-# This flag should normally be set to true (because we want to start the VMs in out network). But
-# just in case (for some reason) we do not want to start the VMs immediately after configuring the 
-# network, we can manage that here.
-g_start_vms_upon_network_provisioning=false
-
-g_attach_vms_to_network=false
-
-
 # Capture time when file was sourced 
 g_sourced_datetime="$(date +%c)"
 
@@ -97,6 +89,9 @@ ovs_show_menu()
   echo "VM base name:                    [$VM_BASE_NAME]"
   echo "VM range:                        [$VM_BASE_NAME$first_vm..$VM_BASE_NAME$NUMBER_OF_VMS]"
   echo "VM port range:                   [$OVS_PORT_NAME_BASE$first_vm..$OVS_PORT_NAME_BASE$NUMBER_OF_VMS]"
+  echo "Attach VM(s) to vSwitch:         [$ATTACH_VMS_TO_VSWITCH]"
+  echo "Auto start VM(s):                [$AUTO_START_VMS]"
+
   echo
 
   # Deployment
@@ -444,10 +439,15 @@ ovs_deploy_network()
     $command
   fi
 
-  # Create tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
-  command="ovs_bridge_add_ports $OVS_BRIDGE"
-  echo "executing: [$command]..."
-  $command
+  if [[ "$ADD_PORTS_TO_VSWITCH" = true ]]; then
+    # Create tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
+    command="ovs_bridge_add_ports $OVS_BRIDGE"
+    echo "executing: [$command]..."
+    $command
+  else
+    msg="Warning [$NUMBER_OF_VMS] ports not attached to switch as per configuration!!!"
+    show_warning_msg "$msg" 
+  fi
 }
 
 #==================================================================================================================
@@ -1491,17 +1491,23 @@ deploy_network()
   # Deploy network
   ovs_deploy_network
   
-  if [[ "$g_attach_vms_to_network" = true ]]; then
+  if [[ "$ATTACH_VMS_TO_VSWITCH" = true ]]; then
+
     # "Attach" VM's network interface to bridge ports
     vms_set_network_interface
-  fi
 
-  if [[ "$g_start_vms_upon_network_provisioning" = true ]]; then
-    # Start all VMs in the testbed
-    vms_start
+    if [[ "$AUTO_START_VMS" = true ]]; then
+      
+      # Start all VMs in the testbed
+      vms_start
+    
+    else
+      msg="Warning [$NUMBER_OF_VMS] VM(s) not started as per configuration!!!"
+      show_warning_msg "$msg"
+    fi
   else
-    msg="Warning [$NUMBER_OF_VMS] VM(s) not started as per configuration!!!"
-    show_warning_msg "$msg"
+    msg="Warning [$NUMBER_OF_VMS] VM(s) not attached to switch as per configuration!!!"
+    show_warning_msg "$msg" 
   fi
 
   # Init QoS configuration
