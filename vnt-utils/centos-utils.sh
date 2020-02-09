@@ -36,6 +36,8 @@ centos_describe_provisioning()
   nfs_show_config_item "sudo yum update"
   nfs_show_config_item "sudo yum group install \"Virtualization Host\""
   nfs_show_config_item "sudo yum group install \"Development Tools\""
+  nfs_show_config_item "sudo yum install virt-install"
+  nfs_show_config_item "sudo setfacl -m u:qemu:rx /home/rolaya"
   nfs_show_config_item "sudo yum install git"
   nfs_show_config_item "sudo yum install rpm-build"
   nfs_show_config_item "sudo yum install openssl-devel"

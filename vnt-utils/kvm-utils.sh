@@ -204,6 +204,7 @@ kvm_ovs_network_provision()
 {
   local command=""
 
+  # Add new persistent virtual network to libvirt
   command="sudo virsh net-define $kvm_ovs_network_definition_file"
   echo "Executing: [$command]"
   $command  
@@ -213,6 +214,10 @@ kvm_ovs_network_provision()
   $command  
   
   command="sudo virsh net-autostart $kvm_ovs_network_name"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo virsh net-dumpxml $kvm_ovs_network_name"
   echo "Executing: [$command]"
   $command  
 
