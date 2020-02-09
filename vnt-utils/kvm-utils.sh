@@ -135,35 +135,13 @@ kvm_vnt_vm_install()
 
   command="sudo virt-install
                --name $KVM_VNT_HOST_NAME
+               --cpu host-passthrough
                --os-type=Linux
                --os-variant=centos7.0
                --network bridge=br0-wired
                --ram=$KVM_VNT_HOST_RAM
                --vcpus=1
                --disk path=$KVM_LIBVIRT_IMAGES_PATH/$KVM_VNT_HOST_NAME.img,bus=virtio,size=$KVM_VNT_HOST_SIZE
-               --graphics $KVM_INSTALL_OPTION_GRAPHICS
-               --location /home/rolaya/iso/CentOS-7-x86_64-DVD-1908.iso
-               --extra-args console=ttyS0"
-  echo "Executing: [$command]"
-  $command                 
-}
-
-#==================================================================================================================
-# Installs "main" CentOS VM on a KVM based hypervisor.
-#==================================================================================================================
-kvm_vm_install()
-{
-  local command=""
-  local vn_name=${1:-"vm_name_is_required"}
-
-  command="sudo virt-install
-               --name $vn_name
-               --os-type=Linux
-               --os-variant=centos7.0
-               --network bridge=br0-wired
-               --ram=$KVM_VNT_HOST_RAM
-               --vcpus=1
-               --disk path=$KVM_LIBVIRT_IMAGES_PATH/$vn_name.img,bus=virtio,size=$KVM_VNT_HOST_SIZE
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --location /home/rolaya/iso/CentOS-7-x86_64-DVD-1908.iso
                --extra-args console=ttyS0"
