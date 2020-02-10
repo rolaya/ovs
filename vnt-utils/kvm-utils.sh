@@ -54,6 +54,7 @@ kvm_utils_show_menu()
   show_menu_option "kvm_vnt_vm_install            " " - \"$KVM_VNT_HOST_NAME\" VM install"
   show_menu_option "kvm_vnt_vm_purge              " " - \"$KVM_VNT_HOST_NAME\" VM purge"
   show_menu_option "kvm_vnt_vm_snapshot_create    " " - \"$KVM_VNT_HOST_NAME\" VM snapshot create"
+  show_menu_option "kvm_vnt_vm_snapshot_restore   " " - \"$KVM_VNT_HOST_NAME\" VM snapshot restore"
   show_menu_option "kvm_vnt_vm_snapshot_list      " " - \"$KVM_VNT_HOST_NAME\" VM snapshot list"
   show_menu_option "kvm_vnt_vm_start              " " - \"$KVM_VNT_HOST_NAME\" VM start"
 
@@ -98,6 +99,19 @@ kvm_vnt_vm_snapshot_create()
   fi
 
   command="sudo virsh snapshot-create-as --domain $KVM_VNT_HOST_NAME --name $snapshot_name"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_vm_snapshot_restore()
+{
+  local command=""
+  local snapshot_name=$1
+
+  command="sudo virsh snapshot-revert $KVM_VNT_HOST_NAME $snapshot_name"
   echo "Executing: [$command]"
   $command
 }
