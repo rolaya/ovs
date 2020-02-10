@@ -65,7 +65,48 @@ kvm_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL}"
   
   show_menu_option "kvm_ovs_network_provision     " " - Provision VNT OVS network"
-  show_menu_option "kvm_vnt_node_install          " " - \"$KVM_VNT_NODE_NAME\" VM install"
+  show_menu_option "kvm_vnt_node_install          " " - \"$KVM_VNT_HOST_NAME\" VM install"
+  show_menu_option "kvm_vnt_guest_list            " " - \"$KVM_VNT_HOST_NAME\" guest list"
+  show_menu_option "kvm_vnt_guest_start           " " - \"$KVM_VNT_HOST_NAME\" guest start"
+  show_menu_option "kvm_vnt_guest_shutdown        " " - \"$KVM_VNT_HOST_NAME\" guest shutdown"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_guest_list()
+{
+  local command=""
+
+  command="sudo virsh list --all"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_guest_start()
+{
+  local command=""
+  local kvm=$1
+
+  command="sudo virsh start --console --force-boot $kvm"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_guest_shutdown()
+{
+  local command=""
+  local kvm=$1
+
+  command="sudo virsh shutdown $1"
+  echo "Executing: [$command]"
+  $command
 }
 
 #==================================================================================================================
@@ -175,7 +216,6 @@ kvm_vnt_node_install()
 
   command="sudo virt-install
                --name $kvm_name
-               --description \"VTNnode1\"
                --os-type=Linux
                --os-variant=debian9
                --ram=$kvm_ram

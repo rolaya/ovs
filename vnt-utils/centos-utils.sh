@@ -55,6 +55,7 @@ centos_describe_provisioning()
   show_config_item "sudo yum install libvirt"
   show_config_item "sudo yum install virt-install"
   show_config_item "sudo yum install virt-viewer"
+  show_config_item "sudo yum install virt-manager"
   show_config_item "sudo systemctl start libvirtd"
   show_config_item "sudo systemctl enable libvirtd"
   show_config_item "sudo systemctl status libvirtd"
@@ -85,7 +86,7 @@ bash_execute_command()
 {
   local command=$1
   
-  #command="sudo virsh undefine $KVM_VNT_HOST_NAME"
+  # Display bash command being executed.
   echo "Executing: [$command]"
   $command
 }
@@ -138,6 +139,7 @@ centos_provision()
   bash_execute_command "sudo yum install libvirt -y"
   bash_execute_command "sudo yum install virt-install -y"
   bash_execute_command "sudo yum install virt-viewer -y"
+  bash_execute_command "sudo yum install virt-manager -y"
   bash_execute_command "sudo systemctl start libvirtd"
   bash_execute_command "sudo systemctl enable libvirtd"
   bash_execute_command "sudo systemctl status libvirtd"
