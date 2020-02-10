@@ -183,7 +183,7 @@ kvm_vnt_node_install()
                --disk path=/var/lib/libvirt/images/kvm_node1.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
-               --location /home/rolaya/iso/debian-9.11.0-amd64-netinst.iso 
+               --location /home/rolaya/iso/debian-9.12.0-amd64-netinst.iso 
                --extra-args console=ttyS0"
   echo "Executing: [$command]"
   $command                 
