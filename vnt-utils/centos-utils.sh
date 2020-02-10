@@ -77,6 +77,12 @@ centos_describe_provisioning()
   show_config_item "update /etc/sysconfig/network-scripts configuration files for OVS"
   show_config_item "deploy_network ?????"
   show_config_item "kvm_ovs_network_provision"
+  show_config_item "kvm_vnt_node_install (node configuraion in file config.env.kvm_vnt_node)"
+  show_config_item "kvm_vnt_node_start"
+
+  note_init "To fix guest stuck at \"Loading initial ramdisk\". Add \"console=ttyS0\" to boot option:"
+  note_add "\"linux /vmlinuz-4.9.0-12-amd64\" during boot. This requires entering editing mode"
+  note_add "immediately at boot time via \"e\" option"
 }
 
 #==================================================================================================================
