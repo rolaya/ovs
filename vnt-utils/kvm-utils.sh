@@ -41,9 +41,9 @@ kvm_utils_show_menu()
   echo
   echo "KVM OVS network name:                [$kvm_ovs_network_name]"
   echo "KVM OVS network config file:         [$kvm_ovs_network_definition_file]"
-  echo "KVM VNT network node name:           [$KVM_VNT_NODE_NAME]"
-  echo "KVM VNT network node RAM:            [$KVM_VNT_NODE_RAM]"
-  echo "KVM VNT network node size:           [$KVM_VNT_NODE_SIZE]"
+  echo "KVM VNT network node name:           [$KVM_VNT_GUEST_NAME]"
+  echo "KVM VNT network node RAM:            [$KVM_VNT_GUEST_RAM]"
+  echo "KVM VNT network node size:           [$KVM_VNT_GUEST_SIZE]"
   echo
 
   # VNT host deployment
@@ -65,10 +65,11 @@ kvm_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL}"
   
   show_menu_option "kvm_ovs_network_provision     " " - Provision VNT OVS network"
-  show_menu_option "kvm_vnt_node_install          " " - \"$KVM_VNT_HOST_NAME\" VM install"
   show_menu_option "kvm_vnt_guest_list            " " - \"$KVM_VNT_HOST_NAME\" guest list"
-  show_menu_option "kvm_vnt_guest_start           " " - \"$KVM_VNT_HOST_NAME\" guest start"
-  show_menu_option "kvm_vnt_guest_shutdown        " " - \"$KVM_VNT_HOST_NAME\" guest shutdown"
+  show_menu_option "kvm_vnt_guest_install         " " - \"$KVM_VNT_GUEST_NAME\" guest install"
+  show_menu_option "kvm_vnt_guest_purge           " " - \"$KVM_VNT_GUEST_NAME\" guest purge"
+  show_menu_option "kvm_vnt_guest_start           " " - \"$KVM_VNT_GUEST_NAME\" guest start"
+  show_menu_option "kvm_vnt_guest_shutdown        " " - \"$KVM_VNT_GUEST_NAME\" guest shutdown"
 }
 
 #==================================================================================================================
@@ -121,6 +122,23 @@ kvm_vnt_vm_purge()
   $command
 
   command="sudo virsh destroy $KVM_VNT_HOST_NAME"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_guest_purge()
+{
+  local command=""
+  local kvm_name=${1:-$KVM_VNT_GUEST_NAME}
+
+  command="sudo virsh undefine $kvm_name"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh destroy $kvm_name"
   echo "Executing: [$command]"
   $command
 }
@@ -207,12 +225,12 @@ kvm_vnt_vm_install()
 #==================================================================================================================
 #
 #==================================================================================================================
-kvm_vnt_node_install()
+kvm_vnt_guest_install()
 {
   local command=""
-  local kvm_name=${1:-$KVM_VNT_NODE_NAME}
-  local kvm_ram=${2:-$KVM_VNT_NODE_RAM}
-  local kvm_size=${3:-$KVM_VNT_NODE_SIZE}
+  local kvm_name=${1:-$KVM_VNT_GUEST_NAME}
+  local kvm_ram=${2:-$KVM_VNT_GUEST_RAM}
+  local kvm_size=${3:-$KVM_VNT_GUEST_SIZE}
 
   command="sudo virt-install
                --name $kvm_name
