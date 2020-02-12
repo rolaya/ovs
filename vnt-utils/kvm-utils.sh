@@ -7,7 +7,7 @@ source "ui-utils.sh"
 g_kvm_vnt_vm_config_file="config.env.kvm_vnt_host"
 
 # The global configuration file for VNT network nodes
-g_kvm_vnt_node_config_file="config.env.kvm_vnt_node"
+g_kvm_vnt_guest_config_file="config.env.kvm_vnt_guest"
 
 # Network related definitions (update according to local environment)
 kvm_ovs_network_name="kvm-ovs-network"
@@ -37,13 +37,17 @@ kvm_utils_show_menu()
   echo "KVM VNT host RAM:                    [$KVM_VNT_HOST_RAM]"
   echo "KVM VNT host size:                   [$KVM_VNT_HOST_SIZE]"
   echo "KVM install graphics option:         [$KVM_INSTALL_OPTION_GRAPHICS]"
-  echo "VNT network node configuration file: [$g_kvm_vnt_node_config_file]"
+  echo "VNT network node configuration file: [$g_kvm_vnt_guest_config_file]"
   echo
   echo "KVM OVS network name:                [$kvm_ovs_network_name]"
   echo "KVM OVS network config file:         [$kvm_ovs_network_definition_file]"
-  echo "KVM VNT network node name:           [$KVM_VNT_GUEST_NAME]"
-  echo "KVM VNT network node RAM:            [$KVM_VNT_GUEST_RAM]"
-  echo "KVM VNT network node size:           [$KVM_VNT_GUEST_SIZE]"
+  echo "KVM VNT guest name:                  [$KVM_VNT_GUEST_NAME]"
+  echo "KVM VNT guest RAM:                   [$KVM_VNT_GUEST_RAM]"
+  echo "KVM VNT guest size:                  [$KVM_VNT_GUEST_SIZE]"
+  echo "KVM VNT guest type:                  [$KVM_VNT_GUEST_TYPE]"
+  echo "KVM VNT guest variant:               [$KVM_VNT_GUEST_VARIANT]"
+  echo "KVM VNT guest iso:                   [$KVM_VNT_GUEST_ISO]"
+
   echo
 
   # VNT host deployment
@@ -228,20 +232,35 @@ kvm_vnt_vm_install()
 kvm_vnt_guest_install()
 {
   local command=""
-  local kvm_name=${1:-$KVM_VNT_GUEST_NAME}
-  local kvm_ram=${2:-$KVM_VNT_GUEST_RAM}
-  local kvm_size=${3:-$KVM_VNT_GUEST_SIZE}
 
+  # Configuration file provided?
+  if [[ $# -eq 1 ]]; then
+    # Source provided VNT network node configuration file
+    source "$1"
+  else
+    # Source default VNT network node configuration file
+    source "$g_kvm_vnt_guest_config_file"
+  fi
+
+  # Set configuration parameters for guest KVM.
+  local kvm_name=$KVM_VNT_GUEST_NAME
+  local kvm_type=$KVM_VNT_GUEST_TYPE
+  local kvm_variant=$KVM_VNT_GUEST_VARIANT
+  local kvm_ram=$KVM_VNT_GUEST_RAM
+  local kvm_size=$KVM_VNT_GUEST_SIZE
+  local kvm_iso=$KVM_VNT_GUEST_ISO
+
+  # Install guest
   command="sudo virt-install
                --name $kvm_name
-               --os-type=Linux
-               --os-variant=debian9
+               --os-type=$kvm_type
+               --os-variant=$kvm_variant
                --ram=$kvm_ram
                --vcpus=1
                --disk path=/var/lib/libvirt/images/kvm_node1.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
-               --location /home/rolaya/iso/debian-9.12.0-amd64-netinst.iso 
+               --location /home/rolaya/iso/$kvm_iso
                --extra-args console=ttyS0"
   echo "Executing: [$command]"
   $command                 
@@ -285,7 +304,7 @@ function kvm_read_configuration()
   source "$g_kvm_vnt_vm_config_file"
 
   # Source VNT network node configuration file
-  source "$g_kvm_vnt_node_config_file"
+  source "$g_kvm_vnt_guest_config_file"
 }
 
 # Capture time when file was sourced 
