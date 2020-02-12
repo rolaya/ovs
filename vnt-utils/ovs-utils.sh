@@ -326,9 +326,6 @@ ovs_bridge_add()
   
   echo "Adding bridge $bridge to system..."
 
-  # Update path with ovs scripts path.
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-
   # create new bridge named "br0"
   command="sudo ovs-vsctl add-br $bridge"
   echo "executing: [$command]..."
@@ -344,9 +341,6 @@ ovs_start()
 
   echo "Starting Open vSwitch..."
 
-  # Update path with ovs scripts path.
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-
   # Starts "ovs-vswitchd:" and "ovsdb-server" daemons
   # This command must be executed as "root" user (for now).
   command="ovs-ctl start --delete-bridges"
@@ -360,8 +354,6 @@ ovs_start()
 ovs_stop()
 {
   # These commands are executed as "root" user (for now)
-
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # This command must be executed as "root" user (for now).
   command="ovs-ctl stop"
@@ -1283,9 +1275,6 @@ ovs_purge_network()
   # These commands are executed as "root" user (for now)
   
   echo "Purging testbed network..."
-
-  # Update path with ovs scripts path.
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
 
   # Remote ports from bridge
   command="ovs_bridge_del_ports $OVS_BRIDGE"
