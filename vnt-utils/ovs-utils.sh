@@ -309,7 +309,7 @@ ovs_bridge_add_ports()
   echo "Adding ports to bridge $bridge..."
 
   # Create a tap interface(s) for VMs 1-6 (and add interface to "br0" bridge).
-  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
+  for ((i = $OVS_PORT_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
     ovs_bridge_add_port $port$i $bridge
   done
 }
@@ -453,14 +453,11 @@ ovs_purge_network_deployment()
 {
   local port=${2:-$OVS_PORT_NAME_BASE}
 
-  # Update path with ovs scripts path.
-  export PATH=$PATH:/usr/local/share/openvswitch/scripts
-
   # "Manually" delete port/interfaces and bridge created via "ovs_deploy_network"
   # Note: it is possible to purge all bridge, etc configuration when starting
   # daemons via command line options (need to try this...).
-  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
-    sudo ovs-vsctl del-port $port$1
+  for ((i = $OVS_PORT_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
+    sudo ovs-vsctl del-port $port$i
   done
   
   sudo ovs-vsctl del-br $OVS_BRIDGE
@@ -982,7 +979,7 @@ ovs_port_qos_netem_purge()
   local port_number=
   local port_name=""
 
-  for ((i = $NUMBER_OF_VMS; i > 0; i--)) do
+  for ((i = $OVS_PORT_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
 
     port_name="$OVS_PORT_NAME_BASE$i"
 
@@ -1266,11 +1263,9 @@ ovs_bridge_del_ports()
   local bridge=$1
   local port=${2:-$OVS_PORT_NAME_BASE}
 
-  # These commands are executed as "root" user (for now)
-  
   echo "Purging $NUMBER_OF_VMS ports from $bridge bridge..."
 
-  for ((i = $NUMBER_OF_VMS; i > 0; i--)) do
+  for ((i = $OVS_PORT_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
 
     # Delete tap port tap_portx from ovs bridge
     ovs_bridge_del_port $port$i $bridge
@@ -1432,7 +1427,7 @@ vms_set_network_interface()
 
   echo "Setting NIC \"network\" configuration for all VMs in the network..."
 
-  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
+  for ((i = $OVS_PORT_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
 
     # Set VM network configuration
     vm_set_network_interface $VM_BASE_NAME$i "1" $network_name$i
@@ -1518,7 +1513,7 @@ qos_initialize()
   echo "Configuring QoS..."
   echo "Initializing QoS max-rate..."
 
-  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
+  for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
 
     # Create QoS record (defaulting to max ethernet rate on each port)
     ovs_port_qos_max_rate_create "$i" $qos_default_max_rate
@@ -1558,12 +1553,9 @@ vm_stop()
 #==================================================================================================================
 vms_start()
 {
-  # For now, we assume the first nic interface
-  local nic="1"
-
   echo "Launching all VMs in the network..."
 
-  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
+  for ((i = $VM_NAME_INDEX_BASE; i <= $NUMBER_OF_VMS; i++)) do
 
     # Start VM
     vm_start $VM_BASE_NAME$i
@@ -1576,12 +1568,9 @@ vms_start()
 #==================================================================================================================
 vms_stop()
 {
-  # For now, we assume the first nic interface
-  local nic="1"
-
   echo "Powering off all VMs in the network..."
 
-  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
+  for ((i = $VM_NAME_INDEX_BASE; i <= $NUMBER_OF_VMS; i++)) do
 
     # Power off VM
     vm_stop $VM_BASE_NAME$i
