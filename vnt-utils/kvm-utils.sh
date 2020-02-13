@@ -257,7 +257,7 @@ kvm_vnt_guest_install()
                --os-variant=$kvm_variant
                --ram=$kvm_ram
                --vcpus=1
-               --disk path=/var/lib/libvirt/images/kvm_node1.img,bus=virtio,size=$kvm_size
+               --disk path=/var/lib/libvirt/images/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --location /home/rolaya/iso/$kvm_iso
