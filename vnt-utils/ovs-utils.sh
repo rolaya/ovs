@@ -5,9 +5,11 @@
 # Source host and environment specific VNT configuration
 source "ui-utils.sh"
 
-# The global configuration file. Modify as per host and VNT
-# requirements
-g_config_file="config.env"
+# The network interface configuration file. Modify as per host.
+g_net_iface_config_file="config.env.net-iface"
+
+# The VNT configuration file. Modify VNT configuration
+g_vnt_config_file="config.env.vnt"
 
 # VirtualBox looks at this as the network name
 network_name=$OVS_PORT_NAME_BASE
@@ -71,23 +73,24 @@ ovs_show_menu()
   # Get date/time (useful for keeping track of changes)
   datetime="$(date +%c)"
 
-  echo "Configuration file:              [$g_config_file]"
-  echo "Host name:                       [$HOSTNAME]"
-  echo "Sourced time:                    [$g_sourced_datetime]"
-  echo "Current time:                    [$datetime]"
-  echo "Using DHCP for host's IP:        [$use_dhcp]"
-  echo "Network interface:               [$HOST_NETIFACE_NAME]"
-  echo "Network interface IP address:    [$HOST_NETIFACE_IP]"
-  echo "Default gateway IP address:      [$GATEWAY_IP]"
-  echo "OVS bridge name:                 [$OVS_BRIDGE]"
-  echo "Tap port interface name:         [$OVS_PORT_NAME_BASE]"
-  echo "Tap port interface index:        [$OVS_PORT_INDEX_BASE]"
-  echo "Number of VMs in testbed:        [$NUMBER_OF_VMS]"
-  echo "VM base name:                    [$VM_BASE_NAME]"
-  echo "VM range:                        [$VM_BASE_NAME$first_vm..$VM_BASE_NAME$NUMBER_OF_VMS]"
-  echo "VM port range:                   [$OVS_PORT_NAME_BASE$OVS_PORT_INDEX_BASE..$OVS_PORT_NAME_BASE$((NUMBER_OF_VMS-1))]"
-  echo "Attach VM(s) to vSwitch:         [$ATTACH_VMS_TO_VSWITCH]"
-  echo "Auto start VM(s):                [$AUTO_START_VMS]"
+  echo "VNT configuration file:           [$g_vnt_config_file]"
+  echo "Network iface configuration file: [$g_net_iface_config_file]"
+  echo "Host name:                        [$HOSTNAME]"
+  echo "Sourced time:                     [$g_sourced_datetime]"
+  echo "Current time:                     [$datetime]"
+  echo "Using DHCP for host's IP:         [$use_dhcp]"
+  echo "Network interface:                [$HOST_NETIFACE_NAME]"
+  echo "Network interface IP address:     [$HOST_NETIFACE_IP]"
+  echo "Default gateway IP address:       [$GATEWAY_IP]"
+  echo "OVS bridge name:                  [$OVS_BRIDGE]"
+  echo "Tap port interface name:          [$OVS_PORT_NAME_BASE]"
+  echo "Tap port interface index:         [$OVS_PORT_INDEX_BASE]"
+  echo "Number of VMs in testbed:         [$NUMBER_OF_VMS]"
+  echo "VM base name:                     [$VM_BASE_NAME]"
+  echo "VM range:                         [$VM_BASE_NAME$first_vm..$VM_BASE_NAME$NUMBER_OF_VMS]"
+  echo "VM port range:                    [$OVS_PORT_NAME_BASE$OVS_PORT_INDEX_BASE..$OVS_PORT_NAME_BASE$((NUMBER_OF_VMS-1))]"
+  echo "Attach VM(s) to vSwitch:          [$ATTACH_VMS_TO_VSWITCH]"
+  echo "Auto start VM(s):                 [$AUTO_START_VMS]"
 
   echo
 
@@ -2200,10 +2203,12 @@ centos_provision_ovs_build()
 #=================================================================================================================
 function provision_environment()
 {
-  echo "Sourcing configuration file: [$g_config_file]"
+  echo "Sourcing configuration file: [$g_net_iface_config_file]"
+  echo "Sourcing configuration file: [$g_vnt_config_file]"
 
   # Source host and environment specific VNT configuration
-  source "$g_config_file"
+  source "$g_net_iface_config_file"
+  source "$g_vnt_config_file"
 }
 
 # Provision environment based on configuration file
