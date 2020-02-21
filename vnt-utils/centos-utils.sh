@@ -49,40 +49,18 @@ centos_describe_provisioning()
 
   show_config_item "update /etc/hosts as required to access hosts in local network by name (sudo required)"
   show_config_item "sudo yum update"
-  show_config_item "sudo yum group install \"Virtualization Host\""
-  show_config_item "sudo yum group install \"Development Tools\""
-  show_config_item "sudo yum install qemu-kvm"
-  show_config_item "sudo yum install libvirt"
-  show_config_item "sudo yum install virt-install"
-  show_config_item "sudo yum install virt-viewer"
-  show_config_item "sudo yum install virt-manager"
-  show_config_item "sudo systemctl start libvirtd"
-  show_config_item "sudo systemctl enable libvirtd"
-  show_config_item "sudo systemctl status libvirtd"
-  show_config_item "sudo setfacl -m u:qemu:rx /home/rolaya"
-  show_config_item "sudo yum install git"
-  show_config_item "sudo yum install rpm-build"
-  show_config_item "sudo yum install openssl-devel"
-  show_config_item "sudo yum install python-devel"
-  show_config_item "sudo yum install groff"
-  show_config_item "sudo yum install graphviz"
-  show_config_item "sudo yum install checkpolicy"
-  show_config_item "sudo yum install selinux-policy-devel"
-  show_config_item "sudo yum install python-twisted-core"
-  show_config_item "sudo yum install libcap-ng-devel"
-  show_config_item "sudo yum install unbound"
-  show_config_item "sudo yum install unbound-devel"
-  show_config_item "sudo yum install python-sphinx"
-  show_config_item "centos_ovs_provision"
+  show_config_item 'sudo yum group install "Virtualization Host"'
+  show_config_item 'sudo yum group install "Development Tools"'
+  show_config_item "centos_provision"
   show_config_item "update /etc/sysconfig/network-scripts configuration files for OVS"
   show_config_item "deploy_network ?????"
   show_config_item "kvm_ovs_network_provision"
   show_config_item "kvm_vnt_node_install (node configuraion in file config.env.kvm_vnt_node)"
   show_config_item "kvm_vnt_node_start"
 
-  note_init "To fix guest stuck at \"Loading initial ramdisk\". Add \"console=ttyS0\" to boot option:"
-  note_add "\"linux /vmlinuz-4.9.0-12-amd64\" during boot. This requires entering editing mode"
-  note_add "immediately at boot time via \"e\" option"
+  note_init 'To fix guest stuck at "Loading initial ramdisk". Add "console=ttyS0" to boot option:'
+  note_add '"linux /vmlinuz-4.9.0-12-amd64" during boot. This requires entering editing mode'
+  note_add 'immediately at boot time via "e" option'
 }
 
 #==================================================================================================================
@@ -137,10 +115,6 @@ centos_ovs_provision()
 #==================================================================================================================
 centos_provision()
 {
-  #show_config_item "update /etc/hosts as required to access hosts in local network by name (sudo required)"
-  bash_execute_command "sudo yum update -y"
-  bash_execute_command "sudo yum group install \"Virtualization Host\" -y"
-  bash_execute_command "sudo yum group install \"Development Tools\" -y"
   bash_execute_command "sudo yum install qemu-kvm"
   bash_execute_command "sudo yum install libvirt -y"
   bash_execute_command "sudo yum install virt-install -y"
@@ -165,7 +139,7 @@ centos_provision()
   bash_execute_command "sudo yum install python-sphinx -y"
 
   # Provision released version of OVS
-  centos_ovs_provision
+  #centos_ovs_provision rolaya temp
 
   #bash_execute_command "update /etc/sysconfig/network-scripts configuration files for OVS"
   #bash_execute_command "deploy_network"
