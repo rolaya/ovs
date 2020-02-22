@@ -51,9 +51,12 @@ centos_describe_provisioning()
   show_config_item "sudo yum update"
   show_config_item 'sudo yum group install "Virtualization Host"'
   show_config_item 'sudo yum group install "Development Tools"'
+  show_config_item "source centos-utils.sh"
   show_config_item "centos_provision"
   show_config_item "update /etc/sysconfig/network-scripts configuration files for OVS"
-  show_config_item "deploy_network ?????"
+  show_config_item "source ovs-utils.sh"
+  show_config_item "deploy_network"
+  show_config_item "source kvm-utils.sh"
   show_config_item "kvm_ovs_network_provision"
   show_config_item "kvm_vnt_node_install (node configuraion in file config.env.kvm_vnt_node)"
   show_config_item "kvm_vnt_node_start"
@@ -139,7 +142,7 @@ centos_provision()
   bash_execute_command "sudo yum install python-sphinx -y"
 
   # Provision released version of OVS
-  #centos_ovs_provision rolaya temp
+  centos_ovs_provision
 
   #bash_execute_command "update /etc/sysconfig/network-scripts configuration files for OVS"
   #bash_execute_command "deploy_network"
