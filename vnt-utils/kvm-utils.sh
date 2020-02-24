@@ -47,6 +47,7 @@ kvm_utils_show_menu()
   echo "KVM VNT guest type:                  [$KVM_VNT_GUEST_TYPE]"
   echo "KVM VNT guest variant:               [$KVM_VNT_GUEST_VARIANT]"
   echo "KVM VNT guest iso:                   [$KVM_VNT_GUEST_ISO]"
+  echo "KVM images dir:                      [$KVM_VNT_IMAGES_DIR]"
 
   echo
 
@@ -258,7 +259,7 @@ kvm_vnt_guest_install()
                --os-variant=$kvm_variant
                --ram=$kvm_ram
                --vcpus=1
-               --disk path=/var/lib/libvirt/images/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
+               --disk path=$KVM_VNT_IMAGES_DIR/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --location /home/rolaya/iso/$kvm_iso
