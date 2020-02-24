@@ -13,8 +13,9 @@ g_kvm_vnt_guest_config_file="config.env.kvm-vnt-nodex"
 kvm_ovs_network_name="kvm-ovs-network"
 kvm_ovs_network_definition_file="kvm-ovs-network.xml"
 
-KVM_VNT_POOL_IMG_NAME="vnt-images"
-KVM_VNT_POOL_IMG_PATH="/var/lib/libvirt/vnt-images"
+# KVM VNT image pool (additional)
+KVM_VNT_POOL_IMG_NAME="kvm-vnt-images"
+KVM_VNT_POOL_IMG_PATH="/home/$KVM_VNT_POOL_IMG_NAME"
 
 #==================================================================================================================
 #
@@ -81,6 +82,7 @@ kvm_utils_show_menu()
   show_menu_option "kvm_vnt_guest_shutdown        " " - \"$KVM_VNT_GUEST_NAME\" guest shutdown"
   echo
   show_menu_option "kvm_vnt_guest_img_pool_create " " - Create storage pool"
+  show_menu_option "kvm_vnt_guest_img_pool_delete " " - Delete storage pool"
 }
 
 #==================================================================================================================
@@ -151,6 +153,30 @@ kvm_vnt_guest_img_pool_create()
   command="sudo virsh pool-info $KVM_VNT_POOL_IMG_NAME"
   echo "Executing: [$command]"
   $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_guest_img_pool_delete()
+{
+  local command=""
+
+  command="sudo virsh pool-list --all"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-destroy $KVM_VNT_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+  
+  command="sudo virsh pool-delete $KVM_VNT_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-list --all"
+  echo "Executing: [$command]"
+  $command  
 }
 
 #==================================================================================================================
