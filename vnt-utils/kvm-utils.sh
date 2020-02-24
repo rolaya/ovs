@@ -7,7 +7,7 @@ source "ui-utils.sh"
 g_kvm_vnt_vm_config_file="config.env.kvm_vnt_host"
 
 # The global configuration file for VNT network nodes
-g_kvm_vnt_guest_config_file="config.env.kvm_vnt_guest"
+g_kvm_vnt_guest_config_file="config.env.kvm-vnt-nodex"
 
 # Network related definitions (update according to local environment)
 kvm_ovs_network_name="kvm-ovs-network"
@@ -71,6 +71,7 @@ kvm_utils_show_menu()
   show_menu_option "kvm_ovs_network_provision     " " - Provision VNT OVS network"
   show_menu_option "kvm_vnt_guest_list            " " - \"$KVM_VNT_HOST_NAME\" guest list"
   show_menu_option "kvm_vnt_guest_install         " " - \"$KVM_VNT_GUEST_NAME\" guest install"
+  show_menu_option "kvm_vnt_guest_import          " " - \"$KVM_VNT_GUEST_NAME\" guest import"
   show_menu_option "kvm_vnt_guest_purge           " " - \"$KVM_VNT_GUEST_NAME\" guest purge"
   show_menu_option "kvm_vnt_guest_start           " " - \"$KVM_VNT_GUEST_NAME\" guest start"
   show_menu_option "kvm_vnt_guest_shutdown        " " - \"$KVM_VNT_GUEST_NAME\" guest shutdown"
@@ -262,6 +263,45 @@ kvm_vnt_guest_install()
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --location /home/rolaya/iso/$kvm_iso
                --extra-args console=ttyS0"
+  echo "Executing: [$command]"
+  $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_vnt_guest_import()
+{
+  local command=""
+
+  # Configuration file provided?
+  if [[ $# -eq 1 ]]; then
+    # Source provided VNT network node configuration file
+    source "$1"
+  else
+    # Source default VNT network node configuration file
+    source "$g_kvm_vnt_guest_config_file"
+  fi
+
+  # Set configuration parameters for guest KVM.
+  local kvm_name=$KVM_VNT_GUEST_NAME
+  local kvm_type=$KVM_VNT_GUEST_TYPE
+  local kvm_variant=$KVM_VNT_GUEST_VARIANT
+  local kvm_ram=$KVM_VNT_GUEST_RAM
+  local kvm_size=$KVM_VNT_GUEST_SIZE
+  local kvm_iso=$KVM_VNT_GUEST_ISO
+
+  # Install guest
+  command="sudo virt-install --debug
+               --name $kvm_name
+               --os-type=$kvm_type
+               --os-variant=$kvm_variant
+               --ram=$kvm_ram
+               --vcpus=1
+               --disk path=/var/lib/libvirt/images/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
+               --network network:$kvm_ovs_network_name
+               --graphics $KVM_INSTALL_OPTION_GRAPHICS
+               --import"
   echo "Executing: [$command]"
   $command                 
 }
