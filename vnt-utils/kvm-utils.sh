@@ -13,6 +13,9 @@ g_kvm_vnt_guest_config_file="config.env.kvm-vnt-nodex"
 kvm_ovs_network_name="kvm-ovs-network"
 kvm_ovs_network_definition_file="kvm-ovs-network.xml"
 
+KVM_VNT_POOL_IMG_NAME="vnt-images"
+KVM_VNT_POOL_IMG_PATH="/var/lib/libvirt/vnt-images"
+
 #==================================================================================================================
 #
 #==================================================================================================================
@@ -76,6 +79,8 @@ kvm_utils_show_menu()
   show_menu_option "kvm_vnt_guest_purge           " " - \"$KVM_VNT_GUEST_NAME\" guest purge"
   show_menu_option "kvm_vnt_guest_start           " " - \"$KVM_VNT_GUEST_NAME\" guest start"
   show_menu_option "kvm_vnt_guest_shutdown        " " - \"$KVM_VNT_GUEST_NAME\" guest shutdown"
+  echo
+  show_menu_option "kvm_vnt_guest_img_pool_create " " - Create storage pool"
 }
 
 #==================================================================================================================
@@ -112,6 +117,38 @@ kvm_vnt_guest_shutdown()
   local kvm=$1
 
   command="sudo virsh shutdown $1"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_vnt_guest_img_pool_create()
+{
+  local command=""
+
+  command="sudo virsh pool-define-as --type dir --name $KVM_VNT_POOL_IMG_NAME --target $KVM_VNT_POOL_IMG_PATH"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-list --all"
+  echo "Executing: [$command]"
+  $command
+  
+  command="sudo virsh pool-build $KVM_VNT_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-start $KVM_VNT_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-autostart $KVM_VNT_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo virsh pool-info $KVM_VNT_POOL_IMG_NAME"
   echo "Executing: [$command]"
   $command
 }
