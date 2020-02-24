@@ -299,7 +299,7 @@ kvm_vnt_guest_import()
                --os-variant=$kvm_variant
                --ram=$kvm_ram
                --vcpus=1
-               --disk path=/var/lib/libvirt/images/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
+               --disk path=$KVM_VNT_IMAGES_DIR/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --import"
