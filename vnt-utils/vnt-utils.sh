@@ -88,11 +88,15 @@ vnt_node_shutdown()
 #==================================================================================================================
 vnt_node_set_latency()
 {
-  local command=""
-  local kvm=${1:-$KVM_GUEST_NAME}
+  local kvm=$1
+  local latency=$2
   local port=0
 
-  ovs_port_qos_latency_create 1 500000
+  # Get port number from vm name
+  vm_name_to_port_number $kvm port
+  
+  # Set latency (in microsecs).
+  ovs_port_qos_latency_create $port $latency
 }
 
 #==================================================================================================================
@@ -108,11 +112,16 @@ vnt_node_del_latency()
 #==================================================================================================================
 vm_name_to_port_number()
 {
-  local command=""
-  local kvm=${1:-$KVM_GUEST_NAME}
-  local port=0
+  local kvm_name=$1
+  local port_number=0
+  local pattern="s/${VM_BASE_NAME}//g"
 
-  ovs_port_qos_latency_create 1 500000
+  # Given a KVM node name (e.g. kvm-vnt-node1) return its port number (1 less than the name index)
+  port_number=$(echo "$kvm_name" | sed "$pattern")
+  port_number=$((port_number-1))
+
+  # Return port number to caller.
+  eval "$2=$port_number"
 }
 
 #==================================================================================================================
