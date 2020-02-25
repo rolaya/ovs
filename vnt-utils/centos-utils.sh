@@ -27,15 +27,15 @@ centos_utils_show_menu()
   echo "Physical host name:                       [$HOSTNAME]"
   echo "Sourced time:                             [$g_sourced_datetime]"
   echo "Current time:                             [$datetime]"  
-  echo "KVM VNT host name:                        [$KVM_VNT_HOST_NAME]"
+  echo "KVM VNT host name:                        [$KVM_HOST_NAME]"
 
   # VNT host deployment
   echo
   echo -e "${TEXT_VIEW_NORMAL_GREEN}VNT host deployment"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "centos_describe_provisioning   " " - \"$KVM_VNT_HOST_NAME\" VM install steps"
-  show_menu_option "centos_provision               " " - \"$KVM_VNT_HOST_NAME\" VM install"
+  show_menu_option "centos_describe_provisioning   " " - \"$KVM_HOST_NAME\" VM install steps"
+  show_menu_option "centos_provision               " " - \"$KVM_HOST_NAME\" VM install"
 }
 
 #==================================================================================================================

@@ -4,18 +4,18 @@
 source "ui-utils.sh"
 
 # The global configuration file for CentOS VNT VM
-g_kvm_vnt_vm_config_file="config.env.kvm_vnt_host"
+g_kvm_vm_config_file="config.env.kvm_host"
 
 # The global configuration file for VNT network nodes
-g_kvm_vnt_guest_config_file="config.env.kvm-vnt-nodex"
+g_kvm_config_file="config.env.kvm-vnt-nodex"
 
 # Network related definitions (update according to local environment)
 kvm_ovs_network_name="kvm-ovs-network"
 kvm_ovs_network_definition_file="kvm-ovs-network.xml"
 
 # KVM VNT image pool (additional)
-KVM_VNT_POOL_IMG_NAME="kvm-vnt-images"
-KVM_VNT_POOL_IMG_PATH="/home/$KVM_VNT_POOL_IMG_NAME"
+KVM_POOL_IMG_NAME="kvm-vnt-images"
+KVM_POOL_IMG_PATH="/home/$KVM_POOL_IMG_NAME"
 
 #==================================================================================================================
 #
@@ -33,25 +33,25 @@ kvm_utils_show_menu()
   # Get date/time (useful for keeping track of changes)
   datetime="$(date +%c)"
 
-  echo "VNT host configuration file:         [$g_kvm_vnt_vm_config_file]"
+  echo "VNT host configuration file:         [$g_kvm_vm_config_file]"
   echo "Host name:                           [$HOSTNAME]"
   echo "Sourced time:                        [$g_sourced_datetime]"
   echo "Current time:                        [$datetime]"
-  echo "KVM VNT host name:                   [$KVM_VNT_HOST_NAME]"
-  echo "KVM VNT host RAM:                    [$KVM_VNT_HOST_RAM]"
-  echo "KVM VNT host size:                   [$KVM_VNT_HOST_SIZE]"
+  echo "KVM VNT host name:                   [$KVM_HOST_NAME]"
+  echo "KVM VNT host RAM:                    [$KVM_HOST_RAM]"
+  echo "KVM VNT host size:                   [$KVM_HOST_SIZE]"
   echo "KVM install graphics option:         [$KVM_INSTALL_OPTION_GRAPHICS]"
-  echo "VNT network node configuration file: [$g_kvm_vnt_guest_config_file]"
+  echo "VNT network node configuration file: [$g_kvm_config_file]"
   echo
   echo "KVM OVS network name:                [$kvm_ovs_network_name]"
   echo "KVM OVS network config file:         [$kvm_ovs_network_definition_file]"
-  echo "KVM VNT guest name:                  [$KVM_VNT_GUEST_NAME]"
-  echo "KVM VNT guest RAM:                   [$KVM_VNT_GUEST_RAM]"
-  echo "KVM VNT guest size:                  [$KVM_VNT_GUEST_SIZE]"
-  echo "KVM VNT guest type:                  [$KVM_VNT_GUEST_TYPE]"
-  echo "KVM VNT guest variant:               [$KVM_VNT_GUEST_VARIANT]"
-  echo "KVM VNT guest iso:                   [$KVM_VNT_GUEST_ISO]"
-  echo "KVM images dir:                      [$KVM_VNT_IMAGES_DIR]"
+  echo "KVM VNT guest name:                  [$KVM_GUEST_NAME]"
+  echo "KVM VNT guest RAM:                   [$KVM_GUEST_RAM]"
+  echo "KVM VNT guest size:                  [$KVM_GUEST_SIZE]"
+  echo "KVM VNT guest type:                  [$KVM_GUEST_TYPE]"
+  echo "KVM VNT guest variant:               [$KVM_GUEST_VARIANT]"
+  echo "KVM VNT guest iso:                   [$KVM_GUEST_ISO]"
+  echo "KVM images dir:                      [$KVM_IMAGES_DIR]"
 
   echo
 
@@ -60,12 +60,12 @@ kvm_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}VNT host deployment"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "kvm_vnt_vm_install            " " - \"$KVM_VNT_HOST_NAME\" VM install"
-  show_menu_option "kvm_vnt_vm_purge              " " - \"$KVM_VNT_HOST_NAME\" VM purge"
-  show_menu_option "kvm_vnt_vm_snapshot_create    " " - \"$KVM_VNT_HOST_NAME\" VM snapshot create"
-  show_menu_option "kvm_vnt_vm_snapshot_restore   " " - \"$KVM_VNT_HOST_NAME\" VM snapshot restore"
-  show_menu_option "kvm_vnt_vm_snapshot_list      " " - \"$KVM_VNT_HOST_NAME\" VM snapshot list"
-  show_menu_option "kvm_vnt_vm_start              " " - \"$KVM_VNT_HOST_NAME\" VM start"
+  show_menu_option "kvm_vm_install            " " - \"$KVM_HOST_NAME\" VM install"
+  show_menu_option "kvm_vm_purge              " " - \"$KVM_HOST_NAME\" VM purge"
+  show_menu_option "kvm_vm_snapshot_create    " " - \"$KVM_HOST_NAME\" VM snapshot create"
+  show_menu_option "kvm_vm_snapshot_restore   " " - \"$KVM_HOST_NAME\" VM snapshot restore"
+  show_menu_option "kvm_vm_snapshot_list      " " - \"$KVM_HOST_NAME\" VM snapshot list"
+  show_menu_option "kvm_vm_start              " " - \"$KVM_HOST_NAME\" VM start"
 
   # VNT network node deployment
   echo
@@ -73,22 +73,22 @@ kvm_utils_show_menu()
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
   
-  show_menu_option "kvm_ovs_network_provision     " " - Provision VNT OVS network"
-  show_menu_option "kvm_vnt_guest_list            " " - \"$KVM_VNT_HOST_NAME\" guest list"
-  show_menu_option "kvm_vnt_guest_install         " " - \"$KVM_VNT_GUEST_NAME\" guest install"
-  show_menu_option "kvm_vnt_guest_import          " " - \"$KVM_VNT_GUEST_NAME\" guest import"
-  show_menu_option "kvm_vnt_guest_purge           " " - \"$KVM_VNT_GUEST_NAME\" guest purge"
-  show_menu_option "kvm_vnt_guest_start           " " - \"$KVM_VNT_GUEST_NAME\" guest start"
-  show_menu_option "kvm_vnt_guest_shutdown        " " - \"$KVM_VNT_GUEST_NAME\" guest shutdown"
+  show_menu_option "kvm_ovs_network_provision " " - Provision VNT OVS network"
+  show_menu_option "kvm_list            " " - \"$KVM_HOST_NAME\" guest list"
+  show_menu_option "kvm_install         " " - \"$KVM_GUEST_NAME\" guest install"
+  show_menu_option "kvm_import          " " - \"$KVM_GUEST_NAME\" guest import"
+  show_menu_option "kvm_purge           " " - \"$KVM_GUEST_NAME\" guest purge"
+  show_menu_option "kvm_start           " " - \"$KVM_GUEST_NAME\" guest start"
+  show_menu_option "kvm_shutdown        " " - \"$KVM_GUEST_NAME\" guest shutdown"
   echo
-  show_menu_option "kvm_vnt_guest_img_pool_create " " - Create storage pool"
-  show_menu_option "kvm_vnt_guest_img_pool_delete " " - Delete storage pool"
+  show_menu_option "kvm_img_pool_create " " - Create storage pool"
+  show_menu_option "kvm_img_pool_delete " " - Delete storage pool"
 }
 
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_guest_list()
+kvm_list()
 {
   local command=""
 
@@ -100,10 +100,10 @@ kvm_vnt_guest_list()
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_guest_start()
+kvm_start()
 {
   local command=""
-  local kvm=$1
+  local kvm=${1:-$KVM_GUEST_NAME}
 
   command="sudo virsh start --console --force-boot $kvm"
   echo "Executing: [$command]"
@@ -113,12 +113,12 @@ kvm_vnt_guest_start()
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_guest_shutdown()
+kvm_shutdown()
 {
   local command=""
-  local kvm=$1
+  local kvm=${1:-$KVM_GUEST_NAME}
 
-  command="sudo virsh shutdown $1"
+  command="sudo virsh shutdown $kvm"
   echo "Executing: [$command]"
   $command
 }
@@ -126,82 +126,10 @@ kvm_vnt_guest_shutdown()
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_guest_img_pool_create()
+kvm_purge()
 {
   local command=""
-
-  command="sudo virsh pool-define-as --type dir --name $KVM_VNT_POOL_IMG_NAME --target $KVM_VNT_POOL_IMG_PATH"
-  echo "Executing: [$command]"
-  $command
-
-  command="sudo virsh pool-list --all"
-  echo "Executing: [$command]"
-  $command
-  
-  command="sudo virsh pool-build $KVM_VNT_POOL_IMG_NAME"
-  echo "Executing: [$command]"
-  $command
-
-  command="sudo virsh pool-start $KVM_VNT_POOL_IMG_NAME"
-  echo "Executing: [$command]"
-  $command
-
-  command="sudo virsh pool-autostart $KVM_VNT_POOL_IMG_NAME"
-  echo "Executing: [$command]"
-  $command  
-
-  command="sudo virsh pool-info $KVM_VNT_POOL_IMG_NAME"
-  echo "Executing: [$command]"
-  $command
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-kvm_vnt_guest_img_pool_delete()
-{
-  local command=""
-
-  command="sudo virsh pool-list --all"
-  echo "Executing: [$command]"
-  $command
-
-  command="sudo virsh pool-destroy $KVM_VNT_POOL_IMG_NAME"
-  echo "Executing: [$command]"
-  $command
-  
-  command="sudo virsh pool-delete $KVM_VNT_POOL_IMG_NAME"
-  echo "Executing: [$command]"
-  $command
-
-  command="sudo virsh pool-list --all"
-  echo "Executing: [$command]"
-  $command  
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-kvm_vnt_vm_purge()
-{
-  local command=""
-
-  command="sudo virsh undefine $KVM_VNT_HOST_NAME"
-  echo "Executing: [$command]"
-  $command
-
-  command="sudo virsh destroy $KVM_VNT_HOST_NAME"
-  echo "Executing: [$command]"
-  $command
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-kvm_vnt_guest_purge()
-{
-  local command=""
-  local kvm_name=${1:-$KVM_VNT_GUEST_NAME}
+  local kvm_name=${1:-$KVM_GUEST_NAME}
 
   command="sudo virsh undefine $kvm_name"
   echo "Executing: [$command]"
@@ -215,7 +143,7 @@ kvm_vnt_guest_purge()
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_vm_snapshot_create()
+kvm_snapshot_create()
 {
   local command=""
   local snapshot_name=$(date +%F-%T)
@@ -226,7 +154,7 @@ kvm_vnt_vm_snapshot_create()
     snapshot_name+="-$1"
   fi
 
-  command="sudo virsh snapshot-create-as --domain $KVM_VNT_HOST_NAME --name $snapshot_name"
+  command="sudo virsh snapshot-create-as --domain $KVM_GUEST_NAME --name $snapshot_name"
   echo "Executing: [$command]"
   $command
 }
@@ -234,12 +162,12 @@ kvm_vnt_vm_snapshot_create()
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_vm_snapshot_restore()
+kvm_snapshot_restore()
 {
   local command=""
   local snapshot_name=$1
 
-  command="sudo virsh snapshot-revert $KVM_VNT_HOST_NAME $snapshot_name"
+  command="sudo virsh snapshot-revert $KVM_GUEST_NAME $snapshot_name"
   echo "Executing: [$command]"
   $command
 }
@@ -247,11 +175,12 @@ kvm_vnt_vm_snapshot_restore()
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_vm_snapshot_list()
+kvm_snapshot_list()
 {
   local command=""
+  local kvm_name=${1:-$KVM_GUEST_NAME}
 
-  command="sudo virsh snapshot-list $KVM_VNT_HOST_NAME"
+  command="sudo virsh snapshot-list $kvm_name --tree"
   echo "Executing: [$command]"
   $command
 }
@@ -259,11 +188,11 @@ kvm_vnt_vm_snapshot_list()
 #==================================================================================================================
 # 
 #==================================================================================================================
-kvm_vnt_vm_start()
+kvm_vm_start()
 {
   local command=""
 
-  command="sudo virsh start --console --force-boot $KVM_VNT_HOST_NAME"
+  command="sudo virsh start --console --force-boot $KVM_HOST_NAME"
   echo "Executing: [$command]"
   $command
 }
@@ -271,19 +200,19 @@ kvm_vnt_vm_start()
 #==================================================================================================================
 # Installs "main" CentOS VM on a KVM based hypervisor.
 #==================================================================================================================
-kvm_vnt_vm_install()
+kvm_vm_install()
 {
   local command=""
 
   command="sudo virt-install
-               --name $KVM_VNT_HOST_NAME
+               --name $KVM_HOST_NAME
                --cpu host-passthrough
                --os-type=Linux
                --os-variant=centos7.0
                --network bridge=br0-wired
-               --ram=$KVM_VNT_HOST_RAM
+               --ram=$KVM_HOST_RAM
                --vcpus=1
-               --disk path=$KVM_LIBVIRT_IMAGES_PATH/$KVM_VNT_HOST_NAME.img,bus=virtio,size=$KVM_VNT_HOST_SIZE
+               --disk path=$KVM_LIBVIRT_IMAGES_PATH/$KVM_HOST_NAME.img,bus=virtio,size=$KVM_HOST_SIZE
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --location /home/rolaya/iso/CentOS-7-x86_64-DVD-1908.iso
                --extra-args console=ttyS0"
@@ -294,7 +223,7 @@ kvm_vnt_vm_install()
 #==================================================================================================================
 #
 #==================================================================================================================
-kvm_vnt_guest_install()
+kvm_install()
 {
   local command=""
 
@@ -304,16 +233,16 @@ kvm_vnt_guest_install()
     source "$1"
   else
     # Source default VNT network node configuration file
-    source "$g_kvm_vnt_guest_config_file"
+    source "$g_kvm_config_file"
   fi
 
   # Set configuration parameters for guest KVM.
-  local kvm_name=$KVM_VNT_GUEST_NAME
-  local kvm_type=$KVM_VNT_GUEST_TYPE
-  local kvm_variant=$KVM_VNT_GUEST_VARIANT
-  local kvm_ram=$KVM_VNT_GUEST_RAM
-  local kvm_size=$KVM_VNT_GUEST_SIZE
-  local kvm_iso=$KVM_VNT_GUEST_ISO
+  local kvm_name=$KVM_GUEST_NAME
+  local kvm_type=$KVM_GUEST_TYPE
+  local kvm_variant=$KVM_GUEST_VARIANT
+  local kvm_ram=$KVM_GUEST_RAM
+  local kvm_size=$KVM_GUEST_SIZE
+  local kvm_iso=$KVM_GUEST_ISO
 
   # Install guest
   command="sudo virt-install
@@ -322,7 +251,7 @@ kvm_vnt_guest_install()
                --os-variant=$kvm_variant
                --ram=$kvm_ram
                --vcpus=1
-               --disk path=$KVM_VNT_IMAGES_DIR/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
+               --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --location /home/rolaya/iso/$kvm_iso
@@ -334,7 +263,7 @@ kvm_vnt_guest_install()
 #==================================================================================================================
 #
 #==================================================================================================================
-kvm_vnt_guest_import()
+kvm_import()
 {
   local command=""
 
@@ -344,16 +273,16 @@ kvm_vnt_guest_import()
     source "$1"
   else
     # Source default VNT network node configuration file
-    source "$g_kvm_vnt_guest_config_file"
+    source "$g_kvm_config_file"
   fi
 
   # Set configuration parameters for guest KVM.
-  local kvm_name=$KVM_VNT_GUEST_NAME
-  local kvm_type=$KVM_VNT_GUEST_TYPE
-  local kvm_variant=$KVM_VNT_GUEST_VARIANT
-  local kvm_ram=$KVM_VNT_GUEST_RAM
-  local kvm_size=$KVM_VNT_GUEST_SIZE
-  local kvm_iso=$KVM_VNT_GUEST_ISO
+  local kvm_name=$KVM_GUEST_NAME
+  local kvm_type=$KVM_GUEST_TYPE
+  local kvm_variant=$KVM_GUEST_VARIANT
+  local kvm_ram=$KVM_GUEST_RAM
+  local kvm_size=$KVM_GUEST_SIZE
+  local kvm_iso=$KVM_GUEST_ISO
 
   # Install guest
   command="sudo virt-install --debug
@@ -362,7 +291,7 @@ kvm_vnt_guest_import()
                --os-variant=$kvm_variant
                --ram=$kvm_ram
                --vcpus=1
-               --disk path=$KVM_VNT_IMAGES_DIR/$KVM_VNT_GUEST_NAME.img,bus=virtio,size=$kvm_size
+               --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --import"
@@ -400,15 +329,71 @@ kvm_ovs_network_provision()
 }
 
 #==================================================================================================================
+# 
+#==================================================================================================================
+kvm_img_pool_create()
+{
+  local command=""
+
+  command="sudo virsh pool-define-as --type dir --name $KVM_POOL_IMG_NAME --target $KVM_POOL_IMG_PATH"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-list --all"
+  echo "Executing: [$command]"
+  $command
+  
+  command="sudo virsh pool-build $KVM_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-start $KVM_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-autostart $KVM_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command  
+
+  command="sudo virsh pool-info $KVM_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+kvm_img_pool_delete()
+{
+  local command=""
+
+  command="sudo virsh pool-list --all"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-destroy $KVM_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+  
+  command="sudo virsh pool-delete $KVM_POOL_IMG_NAME"
+  echo "Executing: [$command]"
+  $command
+
+  command="sudo virsh pool-list --all"
+  echo "Executing: [$command]"
+  $command  
+}
+
+#==================================================================================================================
 #
 #=================================================================================================================
 function kvm_read_configuration()
 {
   # Source host and environment specific VNT configuration
-  source "$g_kvm_vnt_vm_config_file"
+  source "$g_kvm_vm_config_file"
 
   # Source VNT network node configuration file
-  source "$g_kvm_vnt_guest_config_file"
+  source "$g_kvm_config_file"
 }
 
 # Capture time when file was sourced 

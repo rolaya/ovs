@@ -26,9 +26,9 @@ kvm_utils_show_menu()
   echo "Host name:                       [$HOSTNAME]"
   echo "Sourced time:                    [$g_sourced_datetime]"
   echo "Current time:                    [$datetime]"
-  echo "KVM VNT VM name:                 [$KVM_VNT_HOST_NAME]"
-  echo "KVM VNT VM RAM:                  [$KVM_VNT_HOST_RAM]"
-  echo "KVM VNT VM size:                 [$KVM_VNT_HOST_SIZE]"
+  echo "KVM VNT VM name:                 [$KVM_HOST_NAME]"
+  echo "KVM VNT VM RAM:                  [$KVM_HOST_RAM]"
+  echo "KVM VNT VM size:                 [$KVM_HOST_SIZE]"
   echo
 
   # Deployment
@@ -47,13 +47,13 @@ kvm_vnt_vm_install()
   local command=""
 
   command="sudo virt-install
-               --name $KVM_VNT_HOST_NAME
+               --name $KVM_HOST_NAME
                --os-type=Linux
                --os-variant=centos7.0
                --network bridge=virbr0
-               --ram=$KVM_VNT_HOST_RAM
+               --ram=$KVM_HOST_RAM
                --vcpus=1
-               --disk path=$KVM_LIBVIRT_IMAGES_PATH/$KVM_VNT_HOST_NAME.img,bus=virtio,size=$KVM_VNT_HOST_SIZE
+               --disk path=$KVM_LIBVIRT_IMAGES_PATH/$KVM_HOST_NAME.img,bus=virtio,size=$KVM_HOST_SIZE
                --graphics vnc,listen=0.0.0.0 --noautoconsole
                --location /home/rolaya/iso/CentOS-7-x86_64-DVD-1908.iso
                --boot kernel_args="console=ttyS0"
