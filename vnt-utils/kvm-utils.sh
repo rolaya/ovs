@@ -1,21 +1,33 @@
 #!/bin/sh
 
-# Source host and environment specific VNT configuration
+# Generic/common UI utils
 source "ui-utils.sh"
 
-# The global configuration file for CentOS VNT VM
-g_kvm_vm_config_file="config.env.kvm_host"
+###################################################################################################################
+# The global configuration file for the CentOS KVM host. The KVM host is the host for additional (nested) KVM
+# guests (i.e. the VNT network nodes). In the production environment this KVM host currently runs under ESXi. In 
+# development environments this KVM host runs on misc. development machines.
+g_kvm_host_config_file="config.env.kvm_host"
+###################################################################################################################
 
-# The global configuration file for VNT network nodes
-g_kvm_config_file="config.env.kvm-vnt-nodex"
+###################################################################################################################
+# The global configuration file for a single KVM guest (VNT network node).
+g_kvm_guest_config_file="config.env.kvm-vnt-nodex"
+###################################################################################################################
 
-# Network related definitions (update according to local environment)
+###################################################################################################################
+# KVM/OVS network specific configuration. This is the "network" used by all KVM guests. When a KVM guest is
+# created (and subsequently started, it is "attached" to this network). Ultimately we apply traffic shaping on
+# individual ports of the Open vSwitch associated with this network.
 kvm_ovs_network_name="kvm-ovs-network"
 kvm_ovs_network_definition_file="kvm-ovs-network.xml"
+###################################################################################################################
 
+###################################################################################################################
 # KVM VNT image pool (additional)
 KVM_POOL_IMG_NAME="kvm-vnt-images"
 KVM_POOL_IMG_PATH="/home/$KVM_POOL_IMG_NAME"
+###################################################################################################################
 
 #==================================================================================================================
 #
@@ -33,54 +45,73 @@ kvm_utils_show_menu()
   # Get date/time (useful for keeping track of changes)
   datetime="$(date +%c)"
 
-  echo "VNT host configuration file:         [$g_kvm_vm_config_file]"
-  echo "Host name:                           [$HOSTNAME]"
-  echo "Sourced time:                        [$g_sourced_datetime]"
-  echo "Current time:                        [$datetime]"
-  echo "KVM VNT host name:                   [$KVM_HOST_NAME]"
-  echo "KVM VNT host RAM:                    [$KVM_HOST_RAM]"
-  echo "KVM VNT host size:                   [$KVM_HOST_SIZE]"
-  echo "KVM install graphics option:         [$KVM_INSTALL_OPTION_GRAPHICS]"
-  echo "VNT network node configuration file: [$g_kvm_config_file]"
+  echo "KVM host configuration file:   [$g_kvm_host_config_file]"
+  echo "Host name:                     [$HOSTNAME]"
+  echo "Sourced time:                  [$g_sourced_datetime]"
+  echo "Current time:                  [$datetime]"
+
+  # Is KVM host running under KVM (development environment)?
+  if [[ "$KVM_HOST_HYPERVISOR" = "kvm" ]]; then  
+    echo "KVM host name:                 [$KVM_HOST_NAME]"
+    echo "KVM host RAM:                  [$KVM_HOST_RAM]"
+    echo "KVM host size:                 [$KVM_HOST_SIZE]"
+  fi
+
   echo
-  echo "KVM OVS network name:                [$kvm_ovs_network_name]"
-  echo "KVM OVS network config file:         [$kvm_ovs_network_definition_file]"
-  echo "KVM VNT guest name:                  [$KVM_GUEST_NAME]"
-  echo "KVM VNT guest RAM:                   [$KVM_GUEST_RAM]"
-  echo "KVM VNT guest size:                  [$KVM_GUEST_SIZE]"
-  echo "KVM VNT guest type:                  [$KVM_GUEST_TYPE]"
-  echo "KVM VNT guest variant:               [$KVM_GUEST_VARIANT]"
-  echo "KVM VNT guest iso:                   [$KVM_GUEST_ISO]"
-  echo "KVM images dir:                      [$KVM_IMAGES_DIR]"
+  echo "KVM guest configuration file:  [$g_kvm_guest_config_file]"
+  echo "KVM OVS network name:          [$kvm_ovs_network_name]"
+  echo "KVM OVS network config file:   [$kvm_ovs_network_definition_file]"
+  echo "KVM guest name:                [$KVM_GUEST_NAME]"
+  echo "KVM guest RAM:                 [$KVM_GUEST_RAM]"
+  echo "KVM guest size:                [$KVM_GUEST_SIZE]"
+  echo "KVM guest type:                [$KVM_GUEST_TYPE]"
+  echo "KVM guest variant:             [$KVM_GUEST_VARIANT]"
+  echo "KVM guest iso:                 [$KVM_GUEST_ISO]"
+  echo "KVM images dir:                [$KVM_IMAGES_DIR]"
 
   echo
 
-  # VNT host deployment
-  echo
-  echo -e "${TEXT_VIEW_NORMAL_GREEN}VNT host deployment"
-  echo "=========================================================================================================================="
-  echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "kvm_vm_install            " " - \"$KVM_HOST_NAME\" VM install"
-  show_menu_option "kvm_vm_purge              " " - \"$KVM_HOST_NAME\" VM purge"
-  show_menu_option "kvm_vm_snapshot_create    " " - \"$KVM_HOST_NAME\" VM snapshot create"
-  show_menu_option "kvm_vm_snapshot_restore   " " - \"$KVM_HOST_NAME\" VM snapshot restore"
-  show_menu_option "kvm_vm_snapshot_list      " " - \"$KVM_HOST_NAME\" VM snapshot list"
-  show_menu_option "kvm_vm_start              " " - \"$KVM_HOST_NAME\" VM start"
+  # Is KVM host running under KVM (development environment)?
+  if [[ "$KVM_HOST_HYPERVISOR" = "kvm" ]]; then  
+    # VNT host deployment
+    echo
+    echo -e "${TEXT_VIEW_NORMAL_GREEN}VNT host deployment"
+    echo "=========================================================================================================================="
+    echo -e "${TEXT_VIEW_NORMAL}"
+    show_menu_option "kvm_vm_install            " " - \"$KVM_HOST_NAME\" VM install"
+    show_menu_option "kvm_vm_purge              " " - \"$KVM_HOST_NAME\" VM purge"
+    show_menu_option "kvm_vm_snapshot_create    " " - \"$KVM_HOST_NAME\" VM snapshot create"
+    show_menu_option "kvm_vm_snapshot_restore   " " - \"$KVM_HOST_NAME\" VM snapshot restore"
+    show_menu_option "kvm_vm_snapshot_list      " " - \"$KVM_HOST_NAME\" VM snapshot list"
+    show_menu_option "kvm_vm_start              " " - \"$KVM_HOST_NAME\" VM start"
+  fi
 
-  # VNT network node deployment
+  # KVM guest (VNT network node) deployment
   echo
-  echo -e "${TEXT_VIEW_NORMAL_GREEN}VNT network deployment"
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM guest management"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
   
-  show_menu_option "kvm_ovs_network_provision " " - Provision VNT OVS network"
-  show_menu_option "kvm_list            " " - \"$KVM_HOST_NAME\" guest list"
-  show_menu_option "kvm_install         " " - \"$KVM_GUEST_NAME\" guest install"
-  show_menu_option "kvm_import          " " - \"$KVM_GUEST_NAME\" guest import"
-  show_menu_option "kvm_purge           " " - \"$KVM_GUEST_NAME\" guest purge"
-  show_menu_option "kvm_start           " " - \"$KVM_GUEST_NAME\" guest start"
-  show_menu_option "kvm_shutdown        " " - \"$KVM_GUEST_NAME\" guest shutdown"
+  show_menu_option "kvm_list     " " - \"$HOSTNAME\" guest list"
+  show_menu_option "kvm_install  " " - \"$KVM_GUEST_NAME\" guest install"
+  show_menu_option "kvm_import   " " - \"$KVM_GUEST_NAME\" guest import"
+  show_menu_option "kvm_purge    " " - \"$KVM_GUEST_NAME\" guest purge"
+  show_menu_option "kvm_start    " " - \"$KVM_GUEST_NAME\" guest start"
+  show_menu_option "kvm_shutdown " " - \"$KVM_GUEST_NAME\" guest shutdown"
   echo
+  
+  # KVM/OVS network provision
+  echo
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM/OVS network provision"
+  echo "=========================================================================================================================="
+  echo -e "${TEXT_VIEW_NORMAL}"
+  show_menu_option "kvm_ovs_network_provision " " - Provision KVM/OVS network"
+
+  # KVM guest image pool
+  echo
+  echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM guest image pool management"
+  echo "=========================================================================================================================="
+  echo -e "${TEXT_VIEW_NORMAL}"
   show_menu_option "kvm_img_pool_create " " - Create storage pool"
   show_menu_option "kvm_img_pool_delete " " - Delete storage pool"
 }
@@ -233,7 +264,7 @@ kvm_install()
     source "$1"
   else
     # Source default VNT network node configuration file
-    source "$g_kvm_config_file"
+    source "$g_kvm_guest_config_file"
   fi
 
   # Set configuration parameters for guest KVM.
@@ -273,7 +304,7 @@ kvm_import()
     source "$1"
   else
     # Source default VNT network node configuration file
-    source "$g_kvm_config_file"
+    source "$g_kvm_guest_config_file"
   fi
 
   # Set configuration parameters for guest KVM.
@@ -390,10 +421,10 @@ kvm_img_pool_delete()
 function kvm_read_configuration()
 {
   # Source host and environment specific VNT configuration
-  source "$g_kvm_vm_config_file"
+  source "$g_kvm_host_config_file"
 
   # Source VNT network node configuration file
-  source "$g_kvm_config_file"
+  source "$g_kvm_guest_config_file"
 }
 
 # Capture time when file was sourced 

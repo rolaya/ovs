@@ -23,19 +23,18 @@ centos_utils_show_menu()
   datetime="$(date +%c)"
 
   echo "Kernel version:                           [$(uname -r)]"
-  echo "CentOS 7 KVM VNT host configuration file: [$g_centos_config_file]"
-  echo "Physical host name:                       [$HOSTNAME]"
+  echo "KVM host configuration file:              [$g_centos_config_file]"
+  echo "KVM host name:                            [$HOSTNAME]"
   echo "Sourced time:                             [$g_sourced_datetime]"
   echo "Current time:                             [$datetime]"  
-  echo "KVM VNT host name:                        [$KVM_HOST_NAME]"
 
   # VNT host deployment
   echo
   echo -e "${TEXT_VIEW_NORMAL_GREEN}VNT host deployment"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "centos_describe_provisioning   " " - \"$KVM_HOST_NAME\" VM install steps"
-  show_menu_option "centos_provision               " " - \"$KVM_HOST_NAME\" VM install"
+  show_menu_option "centos_describe_provisioning   " " - \"$HOSTNAME\" KVM host install guide"
+  show_menu_option "centos_provision               " " - \"$HOSTNAME\" KVM host install"
 }
 
 #==================================================================================================================
