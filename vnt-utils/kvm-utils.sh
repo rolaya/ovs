@@ -3,6 +3,9 @@
 # Generic/common UI utils
 source "ui-utils.sh"
 
+# VNT configuration file.
+g_vnt_config_file="config.env.vnt"
+
 ###################################################################################################################
 # The global configuration file for the CentOS KVM host. The KVM host is the host for additional (nested) KVM
 # guests (i.e. the VNT network nodes). In the production environment this KVM host currently runs under ESXi. In 
@@ -35,6 +38,7 @@ KVM_POOL_IMG_PATH="/home/$KVM_POOL_IMG_NAME"
 kvm_utils_show_menu()
 {
   local datetime=""
+  local first_vm="1"
 
   # Environment 
   echo
@@ -68,7 +72,11 @@ kvm_utils_show_menu()
   echo "KVM guest variant:             [$KVM_GUEST_VARIANT]"
   echo "KVM guest iso:                 [$KVM_GUEST_ISO]"
   echo "KVM images dir:                [$KVM_IMAGES_DIR]"
-
+  echo
+  echo "Number of KVMs:                [$NUMBER_OF_VMS]"
+  echo "KVM base name:                 [$VM_BASE_NAME]"
+  echo "KVM range:                     [$VM_BASE_NAME$first_vm..$VM_BASE_NAME$NUMBER_OF_VMS]"
+  echo "KVM port range:                [$OVS_PORT_NAME_BASE$OVS_PORT_INDEX_BASE..$OVS_PORT_NAME_BASE$((NUMBER_OF_VMS-1))]"
   echo
 
   # Is KVM host running under KVM (development environment)?
@@ -91,7 +99,6 @@ kvm_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM guest management"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  
   show_menu_option "kvm_list     " " - \"$HOSTNAME\" guest list"
   show_menu_option "kvm_install  " " - \"$KVM_GUEST_NAME\" guest install"
   show_menu_option "kvm_import   " " - \"$KVM_GUEST_NAME\" guest import"
@@ -420,6 +427,9 @@ kvm_img_pool_delete()
 #=================================================================================================================
 function kvm_read_configuration()
 {
+  # Source VNT configuration
+  source "$g_vnt_config_file"
+
   # Source host and environment specific VNT configuration
   source "$g_kvm_host_config_file"
 
