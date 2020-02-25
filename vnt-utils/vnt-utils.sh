@@ -31,7 +31,6 @@ vnt_utils_show_menu()
   # Get date/time (useful for keeping track of changes)
   datetime="$(date +%c)"
 
-  echo "KVM host configuration file:   [$g_kvm_host_config_file]"
   echo "Host name:                     [$HOSTNAME]"
   echo "Sourced time:                  [$g_sourced_datetime]"
   echo "Current time:                  [$datetime]"
@@ -48,10 +47,72 @@ vnt_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM guest management"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "kvm_list     " " - \"$HOSTNAME\" guest list"
-  show_menu_option "kvm_start    " " - \"$KVM_GUEST_NAME\" guest start"
-  show_menu_option "kvm_shutdown " " - \"$KVM_GUEST_NAME\" guest shutdown"
+  show_menu_option "vnt_node_list        " " - VNT node list"
+  show_menu_option "vnt_node_start       " " - VNT node start"
+  show_menu_option "vnt_node_stop        " " - VNT node shutdown"
+  show_menu_option "vnt_node_set_latency " " - VNT node set latency"
+  show_menu_option "vnt_node_del_latency " " - VNT node delete latency"
   echo
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_list()
+{
+  kvm_list
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_start()
+{
+  local kvm=${1:-$KVM_GUEST_NAME}
+
+  message "Starting VNT node: [$kvm]"
+  
+  kvm_start $kvm
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_shutdown()
+{
+  local command=""
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_set_latency()
+{
+  local command=""
+  local kvm=${1:-$KVM_GUEST_NAME}
+  local port=0
+
+  ovs_port_qos_latency_create 1 500000
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_del_latency()
+{
+  local command=""
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vm_name_to_port_number()
+{
+  local command=""
+  local kvm=${1:-$KVM_GUEST_NAME}
+  local port=0
+
+  ovs_port_qos_latency_create 1 500000
 }
 
 #==================================================================================================================
@@ -63,7 +124,7 @@ function vnt_read_configuration()
   source "$g_ovs_config_file"
 
   # Source KVM helpers
-  source "$g_ovs_config_file"
+  source "$g_kvm_config_file"
 }
 
 # Capture time when file was sourced 
