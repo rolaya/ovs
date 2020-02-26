@@ -53,7 +53,7 @@ vnt_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL}"
   show_menu_option "vnt_node_list        " " - VNT node list"
   show_menu_option "vnt_node_start       " " - VNT node start"
-  show_menu_option "vnt_node_stop        " " - VNT node shutdown"
+  show_menu_option "vnt_node_shutdown    " " - VNT node shutdown"
   show_menu_option "vnt_node_set_latency " " - VNT node set latency"
   show_menu_option "vnt_node_del_latency " " - VNT node delete latency"
   echo
@@ -85,6 +85,9 @@ vnt_node_start()
 vnt_node_shutdown()
 {
   local command=""
+  local kvm=$1
+
+  kvm_shutdown $kvm
 }
 
 #==================================================================================================================
