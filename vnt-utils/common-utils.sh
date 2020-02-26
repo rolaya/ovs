@@ -36,14 +36,14 @@ vm_name_to_port_number()
 vm_name_to_port_name()
 {
   local kvm_name=$1
-  local port_number=0
+  local pnumber=0
   local port_name=""
 
   # Given KVM name, gets its corresponding port number
-  vm_name_to_port_number $kvm_name port_number
+  vm_name_to_port_number $kvm_name pnumber
 
   # Format the port name for the KVM (something like "vnet0")
-  port_name="$OVS_PORT_NAME_BASE$port_number"
+  port_name="$OVS_PORT_NAME_BASE$pnumber"
   
   echo "node name: [$kvm_name]"
   echo "port name: [$port_name]"

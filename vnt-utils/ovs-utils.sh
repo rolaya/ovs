@@ -1819,8 +1819,6 @@ ovs_table_find_record()
   local record=""
   local record_uuid=""
 
-echo "1111111 \"$condition\""
-
   echo "Looking for record: [$condition] in table: [$table]"
 
   # If present, all this will return all columns in the record.

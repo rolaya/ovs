@@ -72,7 +72,7 @@ vnt_node_list()
 #==================================================================================================================
 vnt_node_start()
 {
-  local kvm=${1:-$KVM_GUEST_NAME}
+  local kvm=$1
 
   message "Starting VNT node: [$kvm]"
   
@@ -95,12 +95,32 @@ vnt_node_set_latency()
   local kvm=$1
   local latency=$2
   local port=0
+  local current_latency=-1
+  local pattern="s/latency=//g"
+
+  # Get qos information for the node
+  port_get_qos_info $kvm
 
   # Get port number from vm name
   vm_name_to_port_number $kvm port
-  
-  # Set latency (in microsecs).
-  ovs_port_qos_latency_create $port $latency
+
+  # Qos configuired and is it linux-netem?
+  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+
+    # Given something like "latency=500000", extract value (i.e. "500000")
+    current_latency="$(echo "$qos_info_other_config" | grep "latency" | sed "$pattern")"
+
+    # Node configured for latency?
+    if [[ "$current_latency" != "" ]]; then  
+
+      # Set latency (in microsecs).
+      ovs_port_qos_latency_update $port $latency
+    fi
+  else
+
+    # Set linux-netem latency
+    ovs_port_qos_latency_create $port $latency
+  fi
 }
 
 #==================================================================================================================

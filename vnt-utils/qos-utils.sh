@@ -49,14 +49,16 @@ port_get_qos_info()
   local qos_type=""
   local other_config=""
 
-  echo "VM:                 [$kvm]"
-  echo "qos:                [$qos]"
-  echo "qos type:           [$qos_type]"
+  # Initialize
+  qos_info_uuid=""
+  qos_info_external_ids=""
+  qos_info_other_config=""
+  qos_info_queues=""
+  qos_info_type=""
+  pname=""
 
   # Get port name from kvm name
   vm_name_to_port_name $kvm pname
-
-  echo "port name:          [$pname]"
 
   # Find record in "port" table
   table="port"
