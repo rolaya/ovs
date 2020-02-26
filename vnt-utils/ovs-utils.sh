@@ -2207,6 +2207,7 @@ function provision_environment()
   echo "Sourcing configuration file: [$g_vnt_config_file]"
 
   # Source host and environment specific VNT configuration
+  source "qos-utils.sh"
   source "$g_net_iface_config_file"
   source "$g_vnt_config_file"
 }
