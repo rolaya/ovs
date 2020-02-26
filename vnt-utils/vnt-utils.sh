@@ -51,12 +51,15 @@ vnt_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM guest management"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "vnt_node_list        " " - VNT node list"
-  show_menu_option "vnt_node_start       " " - VNT node start"
-  show_menu_option "vnt_node_shutdown    " " - VNT node shutdown"
-  show_menu_option "vnt_node_set_latency " " - VNT node set latency"
-  show_menu_option "vnt_node_del_latency " " - VNT node delete latency"
-  echo
+  show_menu_option "vnt_node_list            " " - VNT node list"
+  show_menu_option "vnt_node_start           " " - VNT node start"
+  show_menu_option "vnt_node_shutdown        " " - VNT node shutdown"
+  show_menu_option "vnt_node_set_latency     " " - VNT node set latency"
+  show_menu_option "vnt_node_del_latency     " " - VNT node delete latency"
+  #show_menu_option "vnt_node_set_max_rate    " " - VNT node set max rate"
+  #show_menu_option "vnt_node_del_max_rate    " " - VNT node delete max rate"
+  show_menu_option "vnt_node_set_packet_loss " " - VNT node set packet loss"
+  show_menu_option "vnt_node_del_packet_loss " " - VNT node delete packet loss"
 }
 
 #==================================================================================================================
@@ -132,7 +135,6 @@ vnt_node_set_latency()
 vnt_node_del_latency()
 {
   local kvm=$1
-  local latency=$2
   local pname=0
   local current_latency=-1
   local pattern="s/latency=//g"
@@ -153,6 +155,87 @@ vnt_node_del_latency()
     if [[ "$current_latency" != "" ]]; then  
 
       # Set latency (in microsecs).
+      ovs_port_qos_netem_delete $pname
+    fi
+  fi
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_set_max_rate()
+{
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_del_max_rate()
+{
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_set_packet_loss()
+{
+  local kvm=$1
+  local loss=$2
+  local port=0
+  local current_loss=-1
+  local pattern="s/loss=//g"
+
+  # Get qos information for the node
+  port_get_qos_info $kvm
+
+  # Get port number from vm name
+  vm_name_to_port_number $kvm port
+
+  # Qos configuired and is it linux-netem?
+  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+
+    # Given something like "loss=30", extract value (i.e. "30")
+    current_loss="$(echo "$qos_info_other_config" | grep "loss" | sed "$pattern")"
+
+    # Node configured for packet loss?
+    if [[ "$current_loss" != "" ]]; then  
+
+      # Set packet loss (as a percentage).
+      ovs_port_qos_packet_loss_update $port $loss
+    fi
+  else
+
+    # Set packet loss (as a percentage).
+    ovs_port_qos_packet_loss_create $port $loss
+  fi
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_del_packet_loss()
+{
+  local kvm=$1
+  local pname=0
+  local current_loss=-1
+  local pattern="s/loss=//g"
+
+  # Get qos information for the node
+  port_get_qos_info $kvm
+
+  # Get port number from vm name
+  vm_name_to_port_name $kvm pname
+
+  # Qos configuired and is it linux-netem?
+  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+
+    # Given something like "loss=30", extract value (i.e. "30")
+    current_loss="$(echo "$qos_info_other_config" | grep "loss" | sed "$pattern")"
+
+    # Node configured for packet loss?
+    if [[ "$current_loss" != "" ]]; then  
+
+      # Remove packet latency
       ovs_port_qos_netem_delete $pname
     fi
   fi
