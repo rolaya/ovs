@@ -99,13 +99,17 @@ vnt_node_shutdown()
 vnt_node_set_latency()
 {
   local kvm=$1
+  local pname=""
   local latency=$2
   local port=0
   local current_latency=-1
   local pattern="s/latency=//g"
 
+  # Get port name from kvm name
+  vm_name_to_port_name $kvm pname
+  
   # Get qos information for the node
-  port_get_qos_info $kvm
+  port_get_qos_info $pname
 
   # Get port number from vm name
   vm_name_to_port_number $kvm port
@@ -135,15 +139,15 @@ vnt_node_set_latency()
 vnt_node_del_latency()
 {
   local kvm=$1
-  local pname=0
+  local pname=""
   local current_latency=-1
   local pattern="s/latency=//g"
 
-  # Get qos information for the node
-  port_get_qos_info $kvm
-
-  # Get port number from vm name
+  # Get port name from kvm name
   vm_name_to_port_name $kvm pname
+
+  # Get qos information for the node
+  port_get_qos_info $pname
 
   # Qos configuired and is it linux-netem?
   if [[ "$qos_info_type" = "linux-netem" ]]; then  
@@ -229,11 +233,15 @@ vnt_node_set_packet_loss()
   local kvm=$1
   local loss=$2
   local port=0
+  local pname=""
   local current_loss=-1
   local pattern="s/loss=//g"
 
+  # Get port name from kvm name
+  vm_name_to_port_name $kvm pname
+
   # Get qos information for the node
-  port_get_qos_info $kvm
+  port_get_qos_info $pname
 
   # Get port number from vm name
   vm_name_to_port_number $kvm port
@@ -263,15 +271,15 @@ vnt_node_set_packet_loss()
 vnt_node_del_packet_loss()
 {
   local kvm=$1
-  local pname=0
+  local pname=""
   local current_loss=-1
   local pattern="s/loss=//g"
 
-  # Get qos information for the node
-  port_get_qos_info $kvm
-
-  # Get port number from vm name
+  # Get port name from kvm name
   vm_name_to_port_name $kvm pname
+
+  # Get qos information for the node
+  port_get_qos_info $pname
 
   # Qos configuired and is it linux-netem?
   if [[ "$qos_info_type" = "linux-netem" ]]; then  
