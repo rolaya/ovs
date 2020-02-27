@@ -930,6 +930,8 @@ ovs_port_qos_htb_delete()
   local qos_uuid=""
   local qos_queues_uuid=""
 
+  echo "deleting max-rate for port: [$ovs_port]"
+
   # Insure port is supplied (something like tap_port1)
   if [[ $# -eq 1 ]]; then
 
@@ -1031,7 +1033,7 @@ ovs_port_qos_netem_delete()
     fi
 
   else
-    echo "Usage: ovs_port_qos_htb_delete port (e.g. ovs_port_qos_htb_delete tap_port1)..."
+    echo "Usage: ovs_port_qos_netem_delete port (e.g. ovs_port_qos_netem_delete tap_port1)..."
   fi
 }
 
@@ -1796,6 +1798,24 @@ ovs_table_get_value()
 #==================================================================================================================
 # 
 #==================================================================================================================
+ovs_table_set_value()
+{
+  local command=""
+  local table=$1
+  local record=$2
+  local column=$3
+  local value=$4
+
+  echo "Updating column: [$column] to value: [$value] in table: [$table] with record id: [$record]"
+
+  command="sudo ovs-vsctl set $table $record $column=$value"
+  echo "Executing: [$command]"
+  value="$($command)"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 ovs_table_clear_values()
 {
   local command=""
@@ -2066,7 +2086,93 @@ ovs_port_find_qos_queue_record()
   IFS=$old_ifs
 
   echo "Qos queue record uuid for port [$port_number]: [$g_qos_queue_record_uuid]"
-}  
+}
+
+#==================================================================================================================
+#==================================================================================================================
+xxx()
+{
+  local port_number=$1
+  local queue_number=$2
+  local command=""
+  local table=""
+  local condidion=""
+  local uuid=""
+  local qos_uuid=""
+  local value=""
+  local old_ifs=""
+  local index=0
+  local uuid_array=""
+  local arraylength=0
+  local uuids=""
+  local record_queue_number=""
+  local record_uuid=""
+
+  echo "Find qos queue record uuid for port: [$port_number] queue number: [$queue_number]..."
+
+  # Initialize qos queue record uuid
+  g_qos_queue_record_uuid=""
+
+  # Find record in "port" table whose "name" is enp5s0 (the name of our wired ethernet interface).
+  table="port"
+  condition="name=$HOST_NETIFACE_NAME"
+  ovs_table_find_record $table "$condition" uuid
+
+  # Get qos uuid associated with port
+  table="port"
+  value="qos"
+  ovs_table_get_value $table $uuid $value qos_uuid
+
+  # Get list of qos queues uuids (for now, result in global variable)
+  table="qos"
+  ovs_table_get_list $table $qos_uuid "queues"
+  
+  # Backup IFS (this is a shell "system/environment" wide setting)
+  old_ifs=$IFS
+
+  # Remove {} from qos_queues_uuid
+  uuids=$(echo "$global_qos_queues_list" | sed 's/{//g')
+  uuids=$(echo "$uuids" | sed 's/}//g')
+
+  # Use space as delimiter
+  IFS=' ,'
+
+  # uuids are separated by IFS
+  read -ra  uuid_array <<< "$uuids"
+
+  arraylength=${#uuid_array[@]}
+
+  echo "processing: [$arraylength] uuids..."
+
+  # Find qos queue based on port number
+  for uuid in "${uuid_array[@]}"; do
+
+    # Extract the queue number from the queues, a single queue value is something like:
+    # 101=50ebde1e-1700-4edb-b18e-366353da3827
+    record_queue_number=${uuid%%=*}
+
+    echo "queue number: ${uuid%%=*} $record_queue_number"
+    echo "uuid[$index]: [$uuid]"
+
+    # Is this the entry we are looking for?
+    if [[ "$record_queue_number" -eq "$queue_number" ]]; then
+
+      # Save the actual record uuid, something like:
+      # 50ebde1e-1700-4edb-b18e-366353da3827
+      record_uuid=$(echo ${uuid:(-36)})
+      echo "$record_uuid"
+      g_qos_queue_record_uuid=$record_uuid
+    fi
+
+    ((index++))
+  
+  done
+
+  # Restore IFS
+  IFS=$old_ifs
+
+  echo "Qos queue record uuid for port [$port_number]: [$g_qos_queue_record_uuid]"
+}
 
 #==================================================================================================================
 #==================================================================================================================
