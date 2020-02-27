@@ -23,14 +23,25 @@ qos_info_type=""
 #==================================================================================================================
 port_log_qos_info()
 {
-  local kvm=$1
+  local port_name=$1
+  local kvm_name="all"
 
-  echo "kvm:          [$kvm]"
+  # Get port name from vm name
+  port_name_to_vm_name $port_name kvm_name
+
+  echo "-------------------------------------------------------------"
+  echo "QoS"
+  echo "-------------------------------------------------------------"
+  echo "port:         [$port_name]"
+  if [[ "$port_name" != "$HOST_NETIFACE_NAME" ]]; then
+    echo "kvm:          [$kvm_name]"
+  fi
   echo "_uuid:        [${qos_info_uuid}]"
   echo "external_ids: [${qos_info_external_ids}]"
   echo "other_config: [${qos_info_other_config}]"
   echo "queues:       [${qos_info_queues}]"
   echo "type:         [${qos_info_type}]"
+  echo "-------------------------------------------------------------"
 }
 
 #==================================================================================================================
@@ -38,27 +49,20 @@ port_log_qos_info()
 #==================================================================================================================
 port_get_qos_info()
 {
-  local command=""
-  local kvm=$1
+  local pname=$1
   local qos_uuid=""
   local qos_defined=false
   local table=""
-  local qos=""
-  local port_number=0
-  local pname=""
   local qos_type=""
   local other_config=""
+  local queues=""
 
-  # Initialize
+  # Initialize all possible qos (table) related parameters, etc.
   qos_info_uuid=""
   qos_info_external_ids=""
   qos_info_other_config=""
   qos_info_queues=""
   qos_info_type=""
-  pname=""
-
-  # Get port name from kvm name
-  vm_name_to_port_name $kvm pname
 
   # Find record in "port" table
   table="port"
@@ -85,27 +89,25 @@ port_get_qos_info()
       # Get qos type and "other_config" (e.g. latency, etc)
       ovs_table_get_value $table $qos_uuid "type" qos_type
       ovs_table_get_value $table $qos_uuid "other_config" other_config
+      ovs_table_get_value $table $qos_uuid "queues" queues
 
       # Remove {} from value (for something like "{latency="500000"} we will end up with "latency="500000").
       other_config=$(echo "$other_config" | sed 's/{//g')
-      other_config=$(echo "$other_config" | sed 's/}//g')      
+      other_config=$(echo "$other_config" | sed 's/}//g')
+      
+      # Remove {} from value (for something like "{100=4c69fead-b0a8-4092-9cbd-a3856765b6e2}" we will end up
+      # with "100=4c69fead-b0a8-4092-9cbd-a3856765b6e2".
+      queues=$(echo "$queues" | sed 's/{//g')
+      queues=$(echo "$queues" | sed 's/}//g')
       
       # Save misc. information in globals
       qos_info_uuid=$qos_uuid
       qos_info_external_ids=""
       qos_info_other_config=$other_config
-      qos_info_queues=""
+      qos_info_queues=$queues
       qos_info_type=$qos_type
-
-      port_log_qos_info $kvm
     fi
   fi
+
+  port_log_qos_info $pname
 }
-
-
-
-
-
-
-
-

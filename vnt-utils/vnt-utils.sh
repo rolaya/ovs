@@ -56,8 +56,8 @@ vnt_utils_show_menu()
   show_menu_option "vnt_node_shutdown        " " - VNT node shutdown"
   show_menu_option "vnt_node_set_latency     " " - VNT node set latency"
   show_menu_option "vnt_node_del_latency     " " - VNT node delete latency"
-  #show_menu_option "vnt_node_set_max_rate    " " - VNT node set max rate"
-  #show_menu_option "vnt_node_del_max_rate    " " - VNT node delete max rate"
+  show_menu_option "vnt_node_set_max_rate    " " - VNT node set max rate"
+  show_menu_option "vnt_node_del_max_rate    " " - VNT node delete max rate"
   show_menu_option "vnt_node_set_packet_loss " " - VNT node set packet loss"
   show_menu_option "vnt_node_del_packet_loss " " - VNT node delete packet loss"
 }
@@ -165,7 +165,32 @@ vnt_node_del_latency()
 #==================================================================================================================
 vnt_node_set_max_rate()
 {
-  echo
+  local kvm=$1
+  local max_rate=$2
+  local port=0
+  local queue_number=0;
+
+  # Get port number from vm name
+  vm_name_to_port_number $kvm port
+
+  # Construct the unique queue id for the kvm/linux-htb.max-rate
+  queue_number=map_qos_type_params_partition["linux-htb.max-rate"]
+  queue_number=$((queue_number+port))
+  
+  # Get queue uuid (if any) associated with the kvm (max-rate information)
+  ovs_port_find_qos_queue_record $port $queue_number
+
+  # max-rate qos configured for port/kvm?
+  if [[ "$g_qos_queue_record_uuid" = "" ]]; then
+
+    # Create max-rate qos for kvm
+    ovs_port_qos_max_rate_create $port $max_rate
+
+  else
+
+    # Update max-rate qos for kvm
+    ovs_port_qos_max_rate_update $port $max_rate
+  fi 
 }
 
 #==================================================================================================================

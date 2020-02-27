@@ -1781,13 +1781,16 @@ ovs_table_get_value()
   value="$($command)"
 
   if [[ "$value" != "" ]]; then
-    echo "table:   [$table]"
-    echo "record:  [$record]"
-    echo "column:  [$column]"
-    echo "value:   [$value]"
+    echo "table:     [$table]"
+    echo "record:    [$record]"
+    echo "column:    [$column]"
+    echo "raw value: [$value]"
+    value=$(echo "$value" | sed 's/{//g')
+    value=$(echo "$value" | sed 's/}//g')
+    echo "value:     [$value]"
   fi
 
-  eval "$4=$value"
+  eval "$4='$value'"
 }
 
 #==================================================================================================================
@@ -1999,7 +2002,7 @@ ovs_port_find_qos_queue_record()
   local record_queue_number=""
   local record_uuid=""
 
-  echo "Find qos queue record uuid for port: [$port_number]..."
+  echo "Find qos queue record uuid for port: [$port_number] queue number: [$queue_number]..."
 
   # Initialize qos queue record uuid
   g_qos_queue_record_uuid=""
