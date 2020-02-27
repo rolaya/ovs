@@ -174,7 +174,7 @@ vnt_node_set_max_rate()
   vm_name_to_port_number $kvm port
 
   # Construct the unique queue id for the kvm/linux-htb.max-rate
-  queue_number=map_qos_type_params_partition["linux-htb.max-rate"]
+  queue_number=${map_qos_type_params_partition["linux-htb.max-rate"]}
   queue_number=$((queue_number+port))
   
   # Get queue uuid (if any) associated with the kvm (max-rate information)
@@ -212,7 +212,7 @@ vnt_node_del_max_rate()
   vm_name_to_port_number $kvm port
 
   # Construct the unique queue id for the kvm/linux-htb.max-rate
-  queue_number=map_qos_type_params_partition["linux-htb.max-rate"]
+  queue_number=${map_qos_type_params_partition["linux-htb.max-rate"]}
   queue_number=$((queue_number+port))
   
   # Get queue uuid (if any) associated with the kvm (max-rate information)
@@ -246,6 +246,9 @@ vnt_node_del_max_rate()
       fi
     
     fi
+
+    #sudo ovs-ofctl del-flows br0 "in_port=101"
+    #sudo ovs-ofctl del-flows br0 "in_port=vnet0"
     # Find
 
     #ovs_table_get_value "qos"
