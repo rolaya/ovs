@@ -28,8 +28,11 @@ vm_name_to_port_number()
   port_number=$(echo "$kvm_name" | sed "$pattern")
   port_number=$((port_number-1))
 
+  echo "kvm name:    [$kvm_name]"
+  echo "port number: [$port_number]"
+
   # Return port number to caller.
-  eval "$2=$port_number"
+  eval "$2='$port_number'"
 }
 
 #==================================================================================================================
@@ -51,7 +54,7 @@ vm_name_to_port_name()
   echo "port name: [$port_name]"
 
   # Return port name to caller.
-  eval "$2=$port_name"
+  eval "$2='$port_name'"
 }
 
 #==================================================================================================================
@@ -68,7 +71,7 @@ port_name_to_vm_number()
   port_number=$((port_number+1))
 
   # Return port number to caller.
-  eval "$2=$port_number"
+  eval "$2='$port_number'"
 }
 
 #==================================================================================================================
@@ -89,7 +92,7 @@ port_name_to_vm_name()
   vm_name=$(echo "$vm_name" | sed 's/[0-9]//g')
 
   # Return port number to caller.
-  eval "$2=$vm_name$vm_number"
+  eval "$2='$vm_name$vm_number'"
 }
 
 #==================================================================================================================
@@ -192,6 +195,7 @@ ovs_table_qos_item_queues_update()
   local value=""
   local old_ifs=""
   local index=0
+  local queues_added=0
   local uuid_array=""
   local arraylength=0
   local uuids=""
@@ -204,6 +208,7 @@ ovs_table_qos_item_queues_update()
 
   # Initialization
   q_queues_queue_list=""
+  qos_queues=""
 
   # Given kvm name gets its port name
   vm_name_to_port_name $kvm_name pname
@@ -213,7 +218,7 @@ ovs_table_qos_item_queues_update()
 
   # Derive the queue number we are interested in
   queue_number=${map_qos_type_params_partition["linux-htb.max-rate"]}
-  queue_number=$((queue_number+pnumber))
+  queue_number=$((queue_number+$pnumber))
 
   echo "Purging qos for kvm: [$kvm_name] with port: [$pname/$pnumber] queue number: [$queue_number]..."
 
@@ -262,18 +267,25 @@ ovs_table_qos_item_queues_update()
     echo "queue number: ${queues_queue%%=*} $record_queue_number"
     echo "uuid[$index]: [$queues_queue]"
 
-    # Is this the entry we are looking for?
+    echo "record_queue_number: $record_queue_number"
+    echo "queue_number:        $queue_number"
+
+    # Keep this queue?
     if [[ "$record_queue_number" != "$queue_number" ]]; then
+
+      # Update queues list    
+      q_queues_queue_list=$q_queues_queue_list$queues_queue
+
+      # Update number of queues that we are going to keep
+      ((queues_added++))
+
+    else
 
       # Save the actual record uuid, something like:
       # 50ebde1e-1700-4edb-b18e-366353da3827
       record_uuid=$(echo ${queues_queue:(-36)})
       echo "$record_uuid"
       g_qos_queue_record_uuid=$record_uuid
-    
-      q_queues_queue_list=$q_queues_queue_list$queues_queue
-
-    else
 
       # Display queue to be removed
       echo "queues queue item: [$queues_queue] to be removed..."
@@ -281,7 +293,8 @@ ovs_table_qos_item_queues_update()
 
     ((index++))
     
-    if [[ "$index" < "$arraylength" ]]; then
+    # Append ", " as required
+    if [[ "$index" < "$arraylength" ]] && [[ "$arraylength" > "2" ]] && [[ "$queues_added" > "0" ]]; then
       q_queues_queue_list=$q_queues_queue_list", "
     fi
 
@@ -290,11 +303,15 @@ ovs_table_qos_item_queues_update()
   # Restore IFS
   IFS=$old_ifs
 
-  # "contain" queues list
+  # Wrap queues list with {}
   qos_queues="{$q_queues_queue_list}"
-  echo "Qos queue record uuid for port [$port_number]: [$g_qos_queue_record_uuid]"
+
+  echo "Removing queue record: [$g_qos_queue_record_uuid] from queues"
   echo "Updated queues list [$qos_queues]"
 
   # Update qos table with new list of queues
   ovs_table_set_value "qos" $qos_uuid "queues" "$qos_queues"
+
+  # Delete queue record
+  ovs_table_delete_record "queue" $record_uuid
 }

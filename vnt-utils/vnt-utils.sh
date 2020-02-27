@@ -198,78 +198,28 @@ vnt_node_set_max_rate()
 #==================================================================================================================
 vnt_node_del_max_rate()
 {
-  local kvm=$1
-  local max_rate=$2
-  local port=0
+  local kvm_name=$1
   local pname=""
-  local queue_number=0
-  local condition=""
-  local uuid=""
-  local qos_uuid=""
-  local queue_info=""
+  local pnumber=-1
+  local command=""
 
-  # Get port number from vm name
-  vm_name_to_port_number $kvm port
+  # Update ovs tables
+  ovs_table_qos_item_queues_update $kvm_name
 
-  # Construct the unique queue id for the kvm/linux-htb.max-rate
-  queue_number=${map_qos_type_params_partition["linux-htb.max-rate"]}
-  queue_number=$((queue_number+port))
-  
-  # Get queue uuid (if any) associated with the kvm (max-rate information)
-  ovs_port_find_qos_queue_record $port $queue_number
+  # Given kvm name gets its port name
+  vm_name_to_port_name $kvm_name pname
 
-  # max-rate qos configured for port/kvm?
-  if [[ "$g_qos_queue_record_uuid" != "" ]]; then
+  # Given kvm name gets its port number
+  vm_name_to_port_number $kvm_name pnumber
 
-    # Get port number from vm name
-    vm_name_to_port_name $kvm pname
+  command=`sudo ovs-ofctl del-flows br0 "in_port=$pnumber"`
+  echo "excuting: [$command]"
+  $comman
 
-    # Find uuid of "eth0" port (for example) in table "port"
-    condition="name=$HOST_NETIFACE_NAME"
-    ovs_table_find_record "port" "$condition" uuid
-
-    # The uuid for the "HOST_NETIFACE_NAME" must always exist
-    if [[ "$uuid" != "" ]]; then
-
-      # Get qos uuid (if any)  
-      ovs_table_get_value "port" $uuid "qos" qos_uuid
-
-      # max-rate configured (for at least one port)?
-      if [[ "$qos_uuid" != "" ]]; then
-      
-        uuid=$qos_uuid
-
-        # Get qos queues
-        ovs_table_get_value "qos" $uuid "queues" queue_info
-
-        ovs_qos_queues_delete_queue $queue_info
-      fi
-    
-    fi
-
-    #sudo ovs-ofctl del-flows br0 "in_port=101"
-    #sudo ovs-ofctl del-flows br0 "in_port=vnet0"
-    # Find
-
-    #ovs_table_get_value "qos"
-
-    #ovs_table_set_value "qos"
-
-    # Update max-rate qos for kvm
-    #ovs_port_qos_htb_delete $pname
-  fi 
+  command=`sudo ovs-ofctl del-flows br0 "in_port=$pname"`
+  echo "excuting: [$command]"
+  $comman
 }
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-ovs_qos_queues_delete_queue()
-{
-  local queue_info=$1
-
-  echo "removing queue info: [$queue_info] from \"queues\" in \"qos\" table"
-}
-
 
 #==================================================================================================================
 # 
