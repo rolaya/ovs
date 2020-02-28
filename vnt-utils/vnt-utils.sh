@@ -336,6 +336,12 @@ vnt_switch_del_qos()
     ovs_table_clear_values "port" "qos" "$condition"
 
   done
+
+  # Get all record uuids from qos table
+  ovs_table_get_records_uuid "qos"
+
+  # Purge all records from qos table
+  ovs_table_purge_records "qos"
 }
 
 #==================================================================================================================

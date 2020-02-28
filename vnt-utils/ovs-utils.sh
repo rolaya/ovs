@@ -1644,6 +1644,98 @@ ovs_list_tables()
 #==================================================================================================================
 # 
 #==================================================================================================================
+ovs_table_get_records_uuid()
+{
+  local table=$1
+  local command=""
+  local result=""
+  local uuids=""
+  local old_ifs=""
+  local index=1
+  local pattern="s/_uuid//g"
+  local delimeted_uuids=""
+
+  message "Retrieving table: [$table] uuids"
+
+  # Get all records (and all information) in given table
+  command="sudo ovs-vsctl list $table"
+  echo "Executing: [$command]"
+  result="$($command)"
+  echo "$result"
+  
+  # Get uuid value, something like "_uuid               : 151ee65e-87de-4624-8e0c-05b4c30289ca"
+  uuids="$(echo "$result" | grep "_uuid")"
+
+  # Remove "_uuid               " from records
+  uuids="$(echo "$uuids" | sed "$pattern")"
+
+  # Remove leading space
+  pattern="s/^[[:space:]]*//"
+  uuids="$(echo "$uuids" | sed "$pattern")"
+
+  # Remove ":"
+  pattern="s/: //"
+  uuids="$(echo "$uuids" | sed "$pattern")"
+
+  # Convert LF to "," (for use as the IFS)
+  delimeted_uuids=$(echo "$uuids" | tr '\n' ',')
+
+  # Backup IFS (this is a shell "system/environment" wide setting)
+  old_ifs=$IFS
+
+  # Use space as delimiter
+  IFS=','
+
+  # uuids are separated by IFS
+  read -ra  uuid_array <<< "$delimeted_uuids"
+
+  # Display all uuids
+  arraylength=${#uuid_array[@]}
+
+  echo "processing: [$arraylength] uuids..."
+
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    echo "uuid[$index]: [$uuid]"
+
+    ((index++))
+  done
+
+  # Restore IFS
+  IFS=$old_ifs
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_purge_records()
+{
+  local table=$1
+  local index=1
+
+  # Get number of records to purge from table
+  arraylength=${#uuid_array[@]}
+
+  message "Purging: [$arraylength] records from table: [$table]"
+
+  # Purge all records
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    echo "uuid[$index]: [$uuid]"
+
+    ovs_table_delete_record $table $uuid
+
+    ((index++))
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 ovs_tables_list()
 {
   local arraylength=0
@@ -1877,7 +1969,7 @@ ovs_table_delete_record()
   local uuid=$2
   local result=""
 
-  echo "Deleting record: [$uuid] from table: [$table]"
+  message "Deleting record: [$uuid] from table: [$table]"
 
   # Delete record from table given table and uuid.
   command="sudo ovs-vsctl destroy $table $uuid"
