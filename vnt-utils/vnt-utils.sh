@@ -60,6 +60,7 @@ vnt_utils_show_menu()
   show_menu_option "vnt_node_del_max_rate    " " - VNT node delete max rate"
   show_menu_option "vnt_node_set_packet_loss " " - VNT node set packet loss"
   show_menu_option "vnt_node_del_packet_loss " " - VNT node delete packet loss"
+  #show_menu_option "vnt_switch_del_qos       " " - VNT switch delete qos"
 }
 
 #==================================================================================================================
@@ -292,6 +293,76 @@ vnt_node_del_packet_loss()
 
       # Remove packet latency
       ovs_port_qos_netem_delete $pname
+    fi
+  fi
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_switch_del_qos()
+{
+  local uuid=""
+  local pname=""
+  local kvm_name=""
+  local qos_uuid=""
+
+  # For now (regardless of configuration) "purge" all qos.
+  for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
+    kvm_name="kvm-vnt-node$i"
+    vnt_node_del_latency $kvm_name
+  done
+
+  for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
+    kvm_name="kvm-vnt-node$i"
+    vnt_node_del_packet_loss $kvm_name
+  done
+
+   for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
+    kvm_name="kvm-vnt-node$i"
+    vnt_node_del_max_rate $kvm_name
+  done 
+
+  ovs_table_clear_values "port" "qos" "name=$HOST_NETIFACE_NAME"
+  
+  for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
+
+    kvm_name="kvm-vnt-node$i"
+
+    vm_name_to_port_name $kvm_name pname
+
+    # ...
+    condition="name=$pname"
+    ovs_table_clear_values "port" "qos" "$condition"
+
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_clear_values()
+{
+  local table=$1
+  local column=$2
+  local condition=$3
+  local uuid=""
+  local column_value=""
+
+  message "clearing values: table: [$table] column: [$column] condition: [$condition]"
+  
+  # Find record given condition
+  ovs_table_find_record $table $condition uuid
+
+  # QoS configured?
+  if [[ "$uuid" != "" ]]; then
+
+    # Get qos uuid associated with port
+    ovs_table_get_value $table $uuid $column column_value
+
+      # QoS configured?
+    if [[ "$column_value" != "" ]]; then 
+      ovs_table_clear_column_values $table $uuid $column
     fi
   fi
 }

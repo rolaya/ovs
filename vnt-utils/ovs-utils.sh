@@ -946,7 +946,7 @@ ovs_port_qos_htb_delete()
       ovs_table_get_value $table $uuid "qos" qos_uuid
 
       # Clear "qos" field in "port" table
-      ovs_table_clear_values $table $uuid $column
+      ovs_table_clear_column_values $table $uuid $column
 
       # Get list of qos queues uuids (for now, result in global variable)
       table="qos"
@@ -1015,7 +1015,7 @@ ovs_port_qos_netem_delete()
       ovs_table_get_value $table $uuid "qos" qos_uuid
 
       # Clear "qos" field in "port" table
-      ovs_table_clear_values $table $uuid $column
+      ovs_table_clear_column_values $table $uuid $column
 
       # Get list of qos queues uuids (for now, result in global variable)
       table="qos"
@@ -1776,7 +1776,7 @@ ovs_table_get_value()
   local column=$3
   local value=""
 
-  echo "Looking for [$column] in table: [$table] with record id: [$record]"
+  message "Get [$column] value in table: [$table] with record id: [$record]"
 
   command="sudo ovs-vsctl get $table $record $column"
   echo "Executing: [$command]"
@@ -1816,7 +1816,7 @@ ovs_table_set_value()
 #==================================================================================================================
 # 
 #==================================================================================================================
-ovs_table_clear_values()
+ovs_table_clear_column_values()
 {
   local command=""
   local table=$1
@@ -1824,7 +1824,7 @@ ovs_table_clear_values()
   local column=$3
   local value=""
 
-  echo "Clearing [$column] in table: [$table] for record: [$record]"
+  message "Clearing [$column] in table: [$table] for record: [$record]"
 
   command="sudo ovs-vsctl clear $table $record $column"
   echo "Executing: [$command]"
