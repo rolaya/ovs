@@ -35,9 +35,8 @@ global_qos_queues_list=""
 # This needs to be modified when support for new qos types is added to this
 # script. This is a global definition used by misc. functions.
 declare -A map_qos_type_params_partition
-map_qos_type_params_partition["linux-htb.max-rate"]=100
-map_qos_type_params_partition["linux-netem.latency"]=200
-map_qos_type_params_partition["linux-netem.loss"]=300
+map_qos_type_params_partition["linux-htb"]=100
+map_qos_type_params_partition["linux-netem"]=400
 
 # Gloabal parameters related to qos (ovs internal) configuration
 g_qos_queue_number=0
@@ -2200,7 +2199,7 @@ ovs_setup_qos_params()
   port_name="$OVS_PORT_NAME_BASE$port_number"
 
   # The queue number will be the base partition+port number (e.g. for
-  # "linux-htb.max-rate" and port number 1, it will be 101).
+  # "linux-htb" and port number 1, it will be 101).
   partition_number=${map_qos_type_params_partition["$qos_type"]}
 
   # QoS type valid?

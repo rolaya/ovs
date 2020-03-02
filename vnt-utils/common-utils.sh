@@ -15,6 +15,9 @@ g_kvm_config_file="kvm-utils.sh"
 
 q_queues_queue_list=""
 
+# Array of "other_config"
+g_array_other_config=""
+
 #==================================================================================================================
 # 
 #==================================================================================================================
@@ -180,7 +183,6 @@ ovs_table_qos_item_queues_list()
   echo "Qos queue record uuid for port [$port_number]: [$g_qos_queue_record_uuid]"
 }
 
-
 #==================================================================================================================
 #==================================================================================================================
 ovs_table_qos_item_queues_update()
@@ -217,7 +219,7 @@ ovs_table_qos_item_queues_update()
   vm_name_to_port_number $kvm_name pnumber
 
   # Derive the queue number we are interested in
-  queue_number=${map_qos_type_params_partition["linux-htb.max-rate"]}
+  queue_number=${map_qos_type_params_partition["linux-htb"]}
   queue_number=$((queue_number+$pnumber))
 
   echo "Purging qos for kvm: [$kvm_name] with port: [$pname/$pnumber] queue number: [$queue_number]..."
@@ -314,4 +316,86 @@ ovs_table_qos_item_queues_update()
 
   # Delete queue record
   ovs_table_delete_record "queue" $record_uuid
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+array_list_items()
+{
+  local arraylength=0
+  local item=""
+  local index=0
+
+  arraylength=${#g_array_other_config[@]}
+
+  message "array contains [$arraylength] items, processing..."
+
+  # Find qos queue based on port number
+  for item in "${g_array_other_config[@]}"; do
+
+    # Extract the queue number from the queues, a single queue value is something like:
+    # 101=50ebde1e-1700-4edb-b18e-366353da3827
+    #record_queue_number=${uuid%%=*}
+
+    echo "item: $item"
+    echo "item[$index]: [$item]"
+
+    # Is this the entry we are looking for?
+    #if [[ "$record_queue_number" -eq "$queue_number" ]]; then
+
+      # Save the actual record uuid, something like:
+      # 50ebde1e-1700-4edb-b18e-366353da3827
+      #record_uuid=$(echo ${uuid:(-36)})
+      #echo "$record_uuid"
+      #g_qos_queue_record_uuid=$record_uuid
+    #fi
+
+    ((index++))
+  
+  done
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+array_list_items_find()
+{
+  local item_name=$1
+  local arraylength=0
+  local item=""
+  local index=0
+  local pattern="s/$item_name=//g"
+  local item_value=""
+
+  # Get number of configuration elements in array
+  arraylength=${#g_array_other_config[@]}
+
+  message "Looking for [$item_name] value in array with [$arraylength] items, processing..."
+
+  # Find configuration item, something like "latency="200000""
+  for item in "${g_array_other_config[@]}"; do
+
+    echo "item: $item"
+    echo "item[$index]: [$item]"
+
+    # Given something like "latency="500000"", extract value (i.e. "500000")
+    item_value="$(echo "$item" | grep "$item_name" | sed "$pattern")"
+
+    # other_config configured?
+    if [[ "$item_value" != "" ]]; then
+      
+      # We are interested in the raw value (given someething ""500000"", extract "500000")
+      item_value=$(echo "$item_value" | sed 's/[^0-9]*//g')
+
+      echo "$item_name: [$item_value]"
+
+      break
+    fi
+
+    ((index++))
+
+  done
+
+  eval "$2='$item_value'"
 }

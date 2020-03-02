@@ -54,10 +54,15 @@ vnt_utils_show_menu()
   show_menu_option "vnt_node_list            " " - VNT node list"
   show_menu_option "vnt_node_start           " " - VNT node start"
   show_menu_option "vnt_node_shutdown        " " - VNT node shutdown"
+  show_menu_option "vnt_node_get_latency     " " - VNT node get latency"
   show_menu_option "vnt_node_set_latency     " " - VNT node set latency"
   show_menu_option "vnt_node_del_latency     " " - VNT node delete latency"
+
+  show_menu_option "vnt_node_get_max_rate    " " - VNT node get max rate"
   show_menu_option "vnt_node_set_max_rate    " " - VNT node set max rate"
   show_menu_option "vnt_node_del_max_rate    " " - VNT node delete max rate"
+
+  show_menu_option "vnt_node_get_packet_loss " " - VNT node get packet loss"
   show_menu_option "vnt_node_set_packet_loss " " - VNT node set packet loss"
   show_menu_option "vnt_node_del_packet_loss " " - VNT node delete packet loss"
   #show_menu_option "vnt_switch_del_qos       " " - VNT switch delete qos"
@@ -178,8 +183,8 @@ vnt_node_set_max_rate()
   # Get port number from vm name
   vm_name_to_port_number $kvm port
 
-  # Construct the unique queue id for the kvm/linux-htb.max-rate
-  queue_number=${map_qos_type_params_partition["linux-htb.max-rate"]}
+  # Construct the unique queue id for the kvm/linux-htb
+  queue_number=${map_qos_type_params_partition["linux-htb"]}
   queue_number=$((queue_number+port))
   
   # Get queue uuid (if any) associated with the kvm (max-rate information)
@@ -293,6 +298,45 @@ vnt_node_del_packet_loss()
 
       # Remove packet latency
       ovs_port_qos_netem_delete $pname
+    fi
+  fi
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_get_packet_loss()
+{
+  local kvm=$1
+  local pname=""
+  local current_loss=-1
+  local pattern="s/loss=//g"
+  local packet_loss=""
+  
+  g_array_other_config=""
+
+  # Get port name from kvm name
+  vm_name_to_port_name $kvm pname
+
+  # Get qos information for the node
+  port_get_qos_info $pname
+
+  # Qos configuired and is it linux-netem?
+  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+
+    # Given something like "loss=30", extract value (i.e. "30")
+    current_loss="$(echo "$qos_info_other_config" | grep "loss" | sed "$pattern")"
+
+    # Node configured for packet loss?
+    if [[ "$current_loss" != "" ]]; then  
+
+      # other_config configuration items are separated by IFS
+      IFS=',' read -ra  g_array_other_config <<< "$qos_info_other_config"
+
+      # Get packet loss (if any) 
+      array_list_items_find "loss" packet_loss
+
+      echo "current packet loss: [$packet_loss]"
     fi
   fi
 }
