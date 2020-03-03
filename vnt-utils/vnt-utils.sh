@@ -119,7 +119,7 @@ vnt_node_set_latency()
   if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
 
     # Update latency (in microsecs).
-    ovs_port_qos_netem_update "latency" $latency
+    ovs_port_qos_netem_update "add" "latency" $latency
 
   else
   
@@ -140,24 +140,38 @@ vnt_node_set_latency()
 vnt_node_del_latency()
 {
   local kvm=$1
-  local pname=""
+  local pnane=""
+  local pnumber=-1
+  local qos_config=""
+  local current_loss=-1
   local current_latency=-1
-  local pattern="s/latency=//g"
 
-  # Get qos information for the node
-  port_get_qos_info $kvm
+  # Get port name and number given kvm name
+  vm_name_to_port_name $kvm pname
+  vm_name_to_port_number $kvm pnumber
 
-  # Qos configuired and is it linux-netem?
-  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
+  message "deleting latency from kvm: [$kvm] port: [$pname/$pnumber]..."
 
-    # Given something like "latency=500000", extract value (i.e. "500000")
-    current_latency="$(echo "$g_qos_info_other_config" | grep "latency" | sed "$pattern")"
+  # Get port latency (if any)
+  vnt_node_get_latency $kvm current_latency
 
-    # Node configured for latency?
-    if [[ "$current_latency" != "" ]]; then  
+  # Get port packet loss (if any)
+  vnt_node_get_packet_loss $kvm current_loss
 
-      # Set latency (in microsecs).
-      ovs_port_qos_netem_delete $pname
+  # Latency configured?
+  if [[ $current_latency != -1 ]]; then
+    
+    # Delete all netem
+    ovs_port_qos_netem_delete $pname
+
+    # Packet loss configured, we want to keep this?
+    if [[ $current_loss != -1 ]]; then
+
+      # Format other_config field (something like "other-config:loss:30").
+      qos_config="other-config:loss=$current_loss"
+
+      # Add/create linux-netem (loss)
+      ovs_port_qos_netem_add $pnumber $qos_config
     fi
   fi
 }
@@ -205,6 +219,8 @@ vnt_node_del_max_rate()
   local pnumber=-1
   local command=""
 
+  message "kvm: [$kvm_name] delete max-rate..."
+
   # Update ovs tables
   ovs_table_qos_item_queues_update $kvm_name
 
@@ -243,7 +259,7 @@ vnt_node_set_packet_loss()
   if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
 
     # Update latency (in microsecs).
-    ovs_port_qos_netem_update "loss" $loss
+    ovs_port_qos_netem_update "add" "loss" $loss
 
   else
   
@@ -264,24 +280,38 @@ vnt_node_set_packet_loss()
 vnt_node_del_packet_loss()
 {
   local kvm=$1
-  local pname=""
+  local pnane=""
+  local pnumber=-1
+  local qos_config=""
   local current_loss=-1
-  local pattern="s/loss=//g"
+  local current_latency=-1
 
-  # Get qos information for the node
-  port_get_qos_info $kvm
+  # Get port name and number given kvm name
+  vm_name_to_port_name $kvm pname
+  vm_name_to_port_number $kvm pnumber
 
-  # Qos configuired and is it linux-netem?
-  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
+  message "deleting packet loss from kvm: [$kvm] port: [$pname/$pnumber]..."
 
-    # Given something like "loss=30", extract value (i.e. "30")
-    current_loss="$(echo "$g_qos_info_other_config" | grep "loss" | sed "$pattern")"
+  # Get port latency (if any)
+  vnt_node_get_latency $kvm current_latency
 
-    # Node configured for packet loss?
-    if [[ "$current_loss" != "" ]]; then  
+  # Get port packet loss (if any)
+  vnt_node_get_packet_loss $kvm current_loss
 
-      # Remove packet latency
-      ovs_port_qos_netem_delete $pname
+  # Packet loss configured?
+  if [[ $current_loss != -1 ]]; then
+    
+    # Delete all netem
+    ovs_port_qos_netem_delete $pname
+
+    # Latency configured, we want to keep this?
+    if [[ $current_latency != -1 ]]; then
+
+      # Format other_config field (something like "other-config:latency:100000").
+      qos_config="other-config:latency=$current_latency"
+
+      # Add/create linux-netem (packet latency)
+      ovs_port_qos_netem_add $pnumber $qos_config
     fi
   fi
 }
@@ -295,7 +325,7 @@ vnt_node_get_latency()
   local pattern="s/latency=//g"
   local latency=-1
   local other_config_info=""
-  
+
   # Get qos information for the node
   port_get_qos_info $kvm
 
@@ -317,6 +347,8 @@ vnt_node_get_latency()
       echo "current latency: [$latency]"
     fi
   fi
+
+  message "kvm: [$kvm] latency: [$latency]..."
 
   # return info to caller
   eval "$2='$latency'"

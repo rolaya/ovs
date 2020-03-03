@@ -631,7 +631,7 @@ ovs_port_qos_htb_create()
   # Format the "complete" qos type, something like "linux-htm.max-rate"
   qos="$qos_type.$qos_other_config"
 
-  echo "Creating qos:"
+  message "Creating qos:"
   echo "port:               [$interface]"
   echo "qos:                [$qos]"
   echo "qos type:           [$qos_type]"
@@ -677,7 +677,7 @@ ovs_port_qos_htb_create()
     port_number=$(echo "$interface" | sed 's/[^0-9]*//g')
 
     # Get queue number based on qos type and port number
-    ovs_setup_qos_params $qos $port_number
+    ovs_setup_qos_params $qos_type $port_number
 
     # Update local value
     queue_number=$g_qos_queue_number
@@ -782,6 +782,7 @@ ovs_port_qos_netem_create()
   local port_name=""
   local qos_type=""
 
+  # We use linux-netem for latency and packet loss.
   qos_type="linux-netem"
 
   message "Creating qos:"
@@ -923,7 +924,7 @@ ovs_port_qos_netem_purge()
 }
 
 #==================================================================================================================
-# Note: at present, we are handling all netem (packet loss, latency)
+# Delete all netem configuration
 #==================================================================================================================
 ovs_port_qos_netem_delete()
 {
@@ -935,6 +936,8 @@ ovs_port_qos_netem_delete()
   local column="qos"
   local qos_uuid=""
   local qos_queues_uuid=""
+
+  message "deleting port: [$ovs_port] netem..."
 
   # Insure port is supplied (something like tap_port1)
   if [[ $# -eq 1 ]]; then
@@ -968,7 +971,7 @@ ovs_port_qos_netem_delete()
     fi
 
   else
-    echo "Usage: ovs_port_qos_netem_delete port (e.g. ovs_port_qos_netem_delete tap_port1)..."
+    echo "Usage: ovs_port_qos_netem_delete port (e.g. ovs_port_qos_netem_delete vnet0)..."
   fi
 }
 
@@ -1053,8 +1056,9 @@ ovs_port_qos_update()
 #==================================================================================================================
 ovs_port_qos_netem_construct()
 {
-  local netem_type=$1
-  local netem_value=$2
+  local command=$1
+  local netem_type=$2
+  local netem_value=$3
   local netem_current_value=-1
   local netem_qos_latency=""
   local netem_qos_loss=""
@@ -1069,35 +1073,50 @@ ovs_port_qos_netem_construct()
   echo "netem:       [$netem_type]"
   echo "value:       [$netem_value]"
 
-  # Format other_config field (something like "other_config:latency:200000").
-  #qos_config="other-config:$qos_other_config=$qos_other_config_value"
-
   # Update qos with latency?
   if [[ $netem_type = "latency" ]]; then
 
-    # Format latency configuration
-    netem_qos_latency="other-config:$netem_type=$netem_value"
+    # Request to add/update netem?
+    if [[ $command = "add" ]]; then
 
-    # Get current packet loss configuration (if any)
-    vnt_node_get_packet_loss $g_qos_info_kvm_name netem_current_value
+      # Format latency configuration
+      netem_qos_latency="other-config:$netem_type=$netem_value"
 
-    # Packet loss configured?
-    if [[ $netem_current_value != -1 ]]; then
-      netem_qos_loss="other-config:loss=$netem_current_value"
+      # Get current packet loss configuration (if any)
+      vnt_node_get_packet_loss $g_qos_info_kvm_name netem_current_value
+
+      # Packet loss configured?
+      if [[ $netem_current_value != -1 ]]; then
+        netem_qos_loss="other-config:loss=$netem_current_value"
+      fi
+
+    else
+
+      # Request to delete netem?
+      netem_qos_latency=""
     fi
 
   # Update qos with packet loss?
   elif [[ $netem_type = "loss" ]]; then
 
-    # Format packet loss configuration
-    netem_qos_loss="other-config:$netem_type=$netem_value"
+    # Request to add/update netem?
+    if [[ $command = "add" ]]; then
+      
+      # Format packet loss configuration
+      netem_qos_loss="other-config:$netem_type=$netem_value"
   
-    # Get current loss configuration
-    vnt_node_get_latency $g_qos_info_kvm_name netem_current_value
+      # Get current loss configuration
+      vnt_node_get_latency $g_qos_info_kvm_name netem_current_value
 
-    # Latency configured?
-    if [[ $netem_current_value != -1 ]]; then
-      netem_qos_latency="other-config:latency=$netem_current_value"
+      # Latency configured?
+      if [[ $netem_current_value != -1 ]]; then
+        netem_qos_latency="other-config:latency=$netem_current_value"
+      fi
+
+    else
+
+      # Request to delete netem?
+      netem_qos_loss=""
     fi
   fi
 
@@ -1115,8 +1134,9 @@ ovs_port_qos_netem_construct()
 #==================================================================================================================
 ovs_port_qos_netem_update()
 {
-  local netem_type=$1
-  local netem_value=$2
+  local command=$1
+  local netem_type=$2
+  local netem_value=$3
   local kvm_name=""
   local port_name=""
   local port_number=-1
@@ -1136,16 +1156,19 @@ ovs_port_qos_netem_update()
   echo "port number: [$g_qos_info_port_number]"
   echo "netem:       [$netem_type]"
   echo "value:       [$netem_value]"
+  echo "command:     [$command]"
 
-  # We have some type of netem qos for the kvm, update it using
-  # new information.
-  ovs_port_qos_netem_construct $netem_type $netem_value qos_config
+  # We have some type of netem qos for the kvm, update it using new information.
+  ovs_port_qos_netem_construct $command $netem_type $netem_value qos_config
 
   # Delete qos entry
   ovs_port_qos_netem_delete $port_name
 
-  # Recreate the qos entry with the new value
-  ovs_port_qos_netem_add $port_number "$qos_config"
+  if [[ "$qos_config" != "" ]]; then
+
+    # Recreate the qos entry with the new value
+    ovs_port_qos_netem_add $port_number "$qos_config"
+  fi
 }
 
 #==================================================================================================================
