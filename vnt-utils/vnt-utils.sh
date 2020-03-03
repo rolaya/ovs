@@ -105,37 +105,32 @@ vnt_node_shutdown()
 vnt_node_set_latency()
 {
   local kvm=$1
-  local pname=""
   local latency=$2
-  local port=0
-  local current_latency=-1
-  local pattern="s/latency=//g"
-
-  # Get port name from kvm name
-  vm_name_to_port_name $kvm pname
+  local pname=""
+  local port=-1
+  local qos_config=""
   
-  # Get qos information for the node
-  port_get_qos_info $pname
+  message "kvm: [$kvm] set latency: [$loss]"
 
-  # Get port number from vm name
-  vm_name_to_port_number $kvm port
+  # Get current qos information for the given kvm
+  port_get_qos_info $kvm
 
-  # Qos configuired and is it linux-netem?
-  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+  # "linux-netem" qos?
+  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
 
-    # Given something like "latency=500000", extract value (i.e. "500000")
-    current_latency="$(echo "$qos_info_other_config" | grep "latency" | sed "$pattern")"
+    # Update latency (in microsecs).
+    ovs_port_qos_netem_update "latency" $latency
 
-    # Node configured for latency?
-    if [[ "$current_latency" != "" ]]; then  
-
-      # Set latency (in microsecs).
-      ovs_port_qos_latency_update $port $latency
-    fi
   else
+  
+    # Get port number from vm name
+    vm_name_to_port_number $kvm port
 
-    # Set linux-netem latency
-    ovs_port_qos_latency_create $port $latency
+    # Format other_config field (something like "other-config:latency:200000").
+    qos_config="other-config:latency=$latency"
+
+    # Add/create linux-netem (latency)
+    ovs_port_qos_netem_add $port $qos_config
   fi
 }
 
@@ -149,17 +144,14 @@ vnt_node_del_latency()
   local current_latency=-1
   local pattern="s/latency=//g"
 
-  # Get port name from kvm name
-  vm_name_to_port_name $kvm pname
-
   # Get qos information for the node
-  port_get_qos_info $pname
+  port_get_qos_info $kvm
 
   # Qos configuired and is it linux-netem?
-  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
 
     # Given something like "latency=500000", extract value (i.e. "500000")
-    current_latency="$(echo "$qos_info_other_config" | grep "latency" | sed "$pattern")"
+    current_latency="$(echo "$g_qos_info_other_config" | grep "latency" | sed "$pattern")"
 
     # Node configured for latency?
     if [[ "$current_latency" != "" ]]; then  
@@ -194,7 +186,7 @@ vnt_node_set_max_rate()
   if [[ "$g_qos_queue_record_uuid" = "" ]]; then
 
     # Create max-rate qos for kvm
-    ovs_port_qos_max_rate_create $port $max_rate
+    ovs_port_qos_max_rate_add $port $max_rate
 
   else
 
@@ -238,36 +230,31 @@ vnt_node_set_packet_loss()
 {
   local kvm=$1
   local loss=$2
-  local port=0
   local pname=""
-  local current_loss=-1
-  local pattern="s/loss=//g"
+  local port=-1
+  local qos_config=""
 
-  # Get port name from kvm name
-  vm_name_to_port_name $kvm pname
+  message "kvm: [$kvm] set packet loss: [$loss]"
 
-  # Get qos information for the node
-  port_get_qos_info $pname
+  # Get current qos information for the given kvm
+  port_get_qos_info $kvm
 
-  # Get port number from vm name
-  vm_name_to_port_number $kvm port
+  # "linux-netem" qos?
+  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
 
-  # Qos configuired and is it linux-netem?
-  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+    # Update latency (in microsecs).
+    ovs_port_qos_netem_update "loss" $loss
 
-    # Given something like "loss=30", extract value (i.e. "30")
-    current_loss="$(echo "$qos_info_other_config" | grep "loss" | sed "$pattern")"
-
-    # Node configured for packet loss?
-    if [[ "$current_loss" != "" ]]; then  
-
-      # Set packet loss (as a percentage).
-      ovs_port_qos_packet_loss_update $port $loss
-    fi
   else
+  
+    # Get port number from vm name
+    vm_name_to_port_number $kvm port
 
-    # Set packet loss (as a percentage).
-    ovs_port_qos_packet_loss_create $port $loss
+    # Format other_config field (something like "other-config:loss:30").
+    qos_config="other-config:loss=$loss"
+
+    # Add/create linux-netem (latency)
+    ovs_port_qos_netem_add $port $qos_config
   fi
 }
 
@@ -281,17 +268,14 @@ vnt_node_del_packet_loss()
   local current_loss=-1
   local pattern="s/loss=//g"
 
-  # Get port name from kvm name
-  vm_name_to_port_name $kvm pname
-
   # Get qos information for the node
-  port_get_qos_info $pname
+  port_get_qos_info $kvm
 
   # Qos configuired and is it linux-netem?
-  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
 
     # Given something like "loss=30", extract value (i.e. "30")
-    current_loss="$(echo "$qos_info_other_config" | grep "loss" | sed "$pattern")"
+    current_loss="$(echo "$g_qos_info_other_config" | grep "loss" | sed "$pattern")"
 
     # Node configured for packet loss?
     if [[ "$current_loss" != "" ]]; then  
@@ -305,39 +289,94 @@ vnt_node_del_packet_loss()
 #==================================================================================================================
 # 
 #==================================================================================================================
+vnt_node_get_latency()
+{
+  local kvm=$1
+  local pattern="s/latency=//g"
+  local latency=-1
+  local other_config_info=""
+  
+  # Get qos information for the node
+  port_get_qos_info $kvm
+
+  # Qos configuired and is it linux-netem?
+  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
+
+    # Given something like "latency=100000", extract value (i.e. "100000")
+    other_config_info="$(echo "$g_qos_info_other_config" | grep "latency" | sed "$pattern")"
+
+    # Node configured for latency?
+    if [[ "$other_config_info" != "" ]]; then  
+
+      # other_config configuration items are separated by IFS
+      IFS=',' read -ra  g_qos_info_other_config_array <<< "$g_qos_info_other_config"
+
+      # Get latency (if any) 
+      array_list_items_find "latency" latency
+
+      echo "current latency: [$latency]"
+    fi
+  fi
+
+  # return info to caller
+  eval "$2='$latency'"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 vnt_node_get_packet_loss()
 {
   local kvm=$1
-  local pname=""
-  local current_loss=-1
   local pattern="s/loss=//g"
-  local packet_loss=""
+  local packet_loss=-1
+  local other_config_info=""
   
-  g_array_other_config=""
-
-  # Get port name from kvm name
-  vm_name_to_port_name $kvm pname
-
   # Get qos information for the node
-  port_get_qos_info $pname
+  port_get_qos_info $kvm
 
   # Qos configuired and is it linux-netem?
-  if [[ "$qos_info_type" = "linux-netem" ]]; then  
+  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
 
     # Given something like "loss=30", extract value (i.e. "30")
-    current_loss="$(echo "$qos_info_other_config" | grep "loss" | sed "$pattern")"
+    other_config_info="$(echo "$g_qos_info_other_config" | grep "loss" | sed "$pattern")"
 
     # Node configured for packet loss?
-    if [[ "$current_loss" != "" ]]; then  
+    if [[ "$other_config_info" != "" ]]; then  
 
       # other_config configuration items are separated by IFS
-      IFS=',' read -ra  g_array_other_config <<< "$qos_info_other_config"
+      IFS=',' read -ra  g_qos_info_other_config_array <<< "$g_qos_info_other_config"
 
       # Get packet loss (if any) 
       array_list_items_find "loss" packet_loss
 
       echo "current packet loss: [$packet_loss]"
     fi
+  fi
+
+  eval "$2='$packet_loss'"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_get_qos_netem()
+{
+  local kvm=$1
+  
+  g_qos_info_other_config_array=""
+
+  # Get qos information for the node
+  port_get_qos_info $kvm
+
+  # Qos linux-netem?
+  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
+
+    # "other_config" configuration items are separated by IFS
+    IFS=',' read -ra  g_qos_info_other_config_array <<< "$g_qos_info_other_config"
+
+    # List netem configuration
+    other_config_array_list_items
   fi
 }
 

@@ -107,29 +107,18 @@ ovs_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}Traffic shaping"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "ovs_port_qos_max_rate_create     " " - set port bandwidth (mbps)"
-  show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_create port_number bandwidth"
-  show_menu_option "                                 " "   example: ovs_port_qos_max_rate_create 1 1000000"
-
-  show_menu_option "ovs_port_qos_packet_loss_create  " " - set port packet loss (%)"
-  show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_create port_number packet_loss"
-  show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_create 1 30"
-
-  show_menu_option "ovs_port_qos_latency_create      " " - set port latency (microseconds)"
-  show_menu_option "                                 " "   usage:   ovs_port_qos_latency_create port_number latency"
-  show_menu_option "                                 " "   example: ovs_port_qos_latency_create 1 500000"
-
+  show_menu_option "ovs_port_qos_max_rate_add        " " - set port bandwidth (mbps)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_add port_number bandwidth"
+  show_menu_option "                                 " "   example: ovs_port_qos_max_rate_add 1 1000000"
   show_menu_option "ovs_port_qos_max_rate_update     " " - update port bandwidth (mbps)"
   show_menu_option "                                 " "   usage:   ovs_port_qos_max_rate_update port_number bandwidth"
   show_menu_option "                                 " "   example: ovs_port_qos_max_rate_update 1 500000"
-
-  show_menu_option "ovs_port_qos_packet_loss_update  " " - update port packet loss (%)"
+  show_menu_option "ovs_port_qos_netem_add           " " - set port latency (microseconds)"
+  show_menu_option "                                 " "   usage:   ovs_port_qos_netem_add port_number latency"
+  show_menu_option "                                 " "   example: ovs_port_qos_netem_add 1 500000"
+  show_menu_option "ovs_port_qos_netem_update        " " - update netem qos (latency/packet loss)"
   show_menu_option "                                 " "   usage:   ovs_port_qos_packet_loss_update port_number packet_loss"
   show_menu_option "                                 " "   example: ovs_port_qos_packet_loss_update 1 30"
-
-  show_menu_option "ovs_port_qos_latency_update      " " - update port latency (microseconds)"
-  show_menu_option "                                 " "   usage:   ovs_port_qos_latency_update port_number latency"
-  show_menu_option "                                 " "   example: ovs_port_qos_latency_update 1 500000"
 
   #echo "\"ovs_bridge_add\"                    - Add bridge to system"
   #echo "\"ovs_bridge_add_ports\"              - Add ports to bridge"
@@ -150,7 +139,6 @@ ovs_show_menu()
   #echo "\"ovs_vm_set_qos\"                       - Configures QoS for specific vm3 (vm attached to tap_port3)"
   #echo "\"ovs_port_qos_max_rate_update\"         - Update QoS record - max rate on specified port"
   #echo "\"ovs_port_qos_packet_loss_update\"      - Update QoS record - packet loss on specified port"
-  #echo "\"ovs_port_qos_latency_update\"          - Update QoS record - latency on specified port"
   
   #echo "\"ovs_purge_network\"                    - Purge deployed network (and QoS)"
   
@@ -552,53 +540,34 @@ qos_id_format()
   local qos_other_config=$4
 
   # Generate a somewhat unique and readable qos id, something like:
-  # "qos_id_enp5s0_tap_port1_linux-htb_max-rate". Ultimately the QoS table
+  # "qos_id_eth0_vnet0_linux-netem". Ultimately the QoS table
   # record is identified by the record's uuid (something like:
   # bdc3fe06-edcc-419b-80bd-d523a0628aa2).
   temp="qos_id"
   temp+="_$HOST_NETIFACE_NAME"
   temp+="_$interface"
   temp+="_$qos_type"
-  temp+="_$qos_other_config"
-  eval "$1=$temp"
+  eval "$1='$temp'"
+
+  echo "generated qos id: [$temp]"
 }
 
 #==================================================================================================================
 #
 #==================================================================================================================
-ovs_port_qos_latency_create()
+ovs_port_qos_netem_add()
 {
   local port_number=$1
+  local qos_config="$2"
   local port_name=""
-  local qos_type=""
-  local qos_other_config=""
-  local qos_other_config_value=$2
 
-  port_name="$OVS_PORT_NAME_BASE$port_number"
-  qos_type="linux-netem"
-  qos_other_config="latency"
-  
-  # Configure (netem latency) traffic shaping on interface.
-  ovs_port_qos_netem_create $port_name $qos_type $qos_other_config $qos_other_config_value $qos_default_latency
-}
+  # Get port name based on port numbed
+  port_number_to_port_name $port_number port_name
 
-#==================================================================================================================
-#
-#==================================================================================================================
-ovs_port_qos_packet_loss_create()
-{
-  local port_number=$1
-  local port_name=""
-  local qos_type=""
-  local qos_other_config=""
-  local qos_other_config_value=$2
+  message "Adding qos [$qos_config] to port: [$port_name]:"
 
-  port_name="$OVS_PORT_NAME_BASE$port_number"
-  qos_type="linux-netem"
-  qos_other_config="loss"
-  
-  # Configure (netem loss) traffic shaping on interface.
-  ovs_port_qos_netem_create $port_name $qos_type $qos_other_config $qos_other_config_value $qos_default_packet_loss
+  # Create netem latency
+  ovs_port_qos_netem_create $port_name "$qos_config"
 }
 
 #==================================================================================================================
@@ -610,7 +579,7 @@ ovs_port_qos_packet_loss_create()
 # port:     the virtual port number.
 # max-rate: the max-rate to set the port to.
 #==================================================================================================================
-ovs_port_qos_max_rate_create()
+ovs_port_qos_max_rate_add()
 {
   local port_number=$1
   local port_name=""
@@ -801,37 +770,27 @@ ovs_port_qos_netem_create()
   local command=""
   local queue_name=""
   local interface=$1
-  local qos_type=$2
-  local qos_other_config=$3
-  local qos_other_config_value=$4
-  local qos_default_value=$5
+  local qos_other_config="$2"
   local qos_id=""
   local queue_uuid=""
   local of_port_request=""
   local queue_number=0
   local uuids=""
-  local qos_defined=false
-  local linux_htb_qos_record_uuid=""
-  local linux_htb_queue_record_uuid=""
   local old_ifs=""
   local table=""
-  local qos=""
   local port_number=0
   local port_name=""
+  local qos_type=""
 
-  # Format the "complete" qos type, something like "linux-htm.max-rate"
-  qos="$qos_type.$qos_other_config"
+  qos_type="linux-netem"
 
-  echo "Creating qos:"
+  message "Creating qos:"
   echo "port:               [$interface]"
-  echo "qos:                [$qos]"
   echo "qos type:           [$qos_type]"
-  echo "default value:      [$qos_default_value]"
   echo "other config:       [$qos_other_config]"
-  echo "other config value: [$qos_other_config_value]"
 
   # Perform some parameter
-  if [[ $# -eq 5 ]] && [[ $4 -gt 0 ]]; then
+  if [[ $# -eq 2 ]]; then
 
     # When qos is linux-netem, the qos configuration DOES not include the physical interface.
     # (Need to understand this better (see ovs documentation in web)).
@@ -853,7 +812,7 @@ ovs_port_qos_netem_create()
     port_number=$(echo "$interface" | sed 's/[^0-9]*//g')
 
     # Get queue number based on qos type and port number
-    ovs_setup_qos_params $qos $port_number
+    ovs_setup_qos_params $qos_type $port_number
 
     # Update local value
     queue_number=$g_qos_queue_number
@@ -867,29 +826,9 @@ ovs_port_qos_netem_create()
     command="sudo ovs-vsctl -- \
     set interface $interface ofport_request=$of_port_request -- \
     set port $port_name qos=@$qos_id -- \
-    --id=@$qos_id create qos type=$qos_type \
-        other-config:$qos_other_config=$qos_other_config_value"
+    --id=@$qos_id create qos type=$qos_type $qos_other_config"
     echo "excuting: [$command]"
     uuids="$($command)"
-
-    # Backup IFS (this is a "system/environment" wide setting)
-    old_ifs=$IFS
-
-    # Convert LF to space (for use as the IFS)
-    delimeted_uuids=$(echo "$uuids" | tr '\n' ' ')
-
-    # Use space as delimiter
-    IFS=' '
-
-    # uuids are separated by IFS
-    read -ra  uuid_array <<< "$delimeted_uuids"
-    
-    # Restore IFS
-    IFS=$old_ifs
-
-    # (for debugging) save the uuid of the qos, queue records
-    linux_htb_qos_record_uuid="${uuid_array[0]}"
-    linux_htb_queue_record_uuid="${uuid_array[1]}"
 
     # Format and execute flow command (creates and initializes new record in Queue table)
     command="sudo ovs-ofctl add-flow $OVS_BRIDGE in_port=$of_port_request,actions=set_queue:$queue_number,normal"
@@ -902,12 +841,9 @@ ovs_port_qos_netem_create()
     echo "interface:           [$interface]"
     echo "type:                [$qos_type]"
     echo "other config:        [$qos_other_config]"
-    echo "other config value:  [$qos_other_config_value]"
     echo "qos id:              [$qos_id]"
     echo "of port request:     [$of_port_request]"
     echo "of queue number:     [$queue_number]"
-    echo "qos uuid:            [$linux_htb_qos_record_uuid]"
-    echo "queue uuid:          [$linux_htb_queue_record_uuid]"
 
   else
     echo "Usage:    ovs_port_qos_netem_create qos_type qos_other_config qos_other_config_value qos_default_max_rate..."
@@ -1113,107 +1049,103 @@ ovs_port_qos_update()
 }
 
 #==================================================================================================================
-# Updates QoS - netem latency.
+# Updates QoS - netem (packet loss/latency)
 #==================================================================================================================
-ovs_port_qos_latency_update()
+ovs_port_qos_netem_construct()
 {
-  local record_uuid=""
-  local port_number=$1
-  local queue_number=0
-  local latency=$2
-  local qos_type="linux-netem"
-  local other_config="latency"
-  local port_name=""
+  local netem_type=$1
+  local netem_value=$2
+  local netem_current_value=-1
+  local netem_qos_latency=""
+  local netem_qos_loss=""
+  local qos_other_config=""
 
-  # Update QoS max rate.
+  # Update netem QoS.
+  message "Constructing new linux-netem..."
 
-  port_name="$OVS_PORT_NAME_BASE$port_number"
+  echo "kvm name:    [$g_qos_info_kvm_name]"
+  echo "port name:   [$g_qos_info_port_name]"
+  echo "port number: [$g_qos_info_port_number]"
+  echo "netem:       [$netem_type]"
+  echo "value:       [$netem_value]"
 
-  echo "Update port qos:"
-  echo "port number: [$table]"
-  echo "port name:   [$port_name]"
-  echo "latency:     [$latency microseconds]"
+  # Format other_config field (something like "other_config:latency:200000").
+  #qos_config="other-config:$qos_other_config=$qos_other_config_value"
 
-  # Insure uuid and latency are supplied
-  if [[ $# -eq 2 ]]; then
+  # Update qos with latency?
+  if [[ $netem_type = "latency" ]]; then
 
-    # Format port name
-    port_name="$OVS_PORT_NAME_BASE$port_number"
+    # Format latency configuration
+    netem_qos_latency="other-config:$netem_type=$netem_value"
 
-    # Delete qos entry
-    ovs_port_qos_netem_delete $port_name
+    # Get current packet loss configuration (if any)
+    vnt_node_get_packet_loss $g_qos_info_kvm_name netem_current_value
 
-    # Recreate the qos entry with the new value
-    ovs_port_qos_latency_create $port_number $latency
+    # Packet loss configured?
+    if [[ $netem_current_value != -1 ]]; then
+      netem_qos_loss="other-config:loss=$netem_current_value"
+    fi
 
-    # Find record in "port" table
-    #table="port"
-    #condition="name=$port_name"
-    #ovs_table_find_record $table "$condition" uuid
+  # Update qos with packet loss?
+  elif [[ $netem_type = "loss" ]]; then
 
-    # Get qos uuid associated with port
-    #table="port"
-    #value="qos"
-    #ovs_table_get_value $table $uuid $value qos_uuid
+    # Format packet loss configuration
+    netem_qos_loss="other-config:$netem_type=$netem_value"
+  
+    # Get current loss configuration
+    vnt_node_get_latency $g_qos_info_kvm_name netem_current_value
 
-    # Update port's qos
-    #ovs_port_qos_update $qos_uuid $other_config $latency
-
-  else
-    echo "Usage: ovs_port_qos_packet_loss_update...."
+    # Latency configured?
+    if [[ $netem_current_value != -1 ]]; then
+      netem_qos_latency="other-config:latency=$netem_current_value"
+    fi
   fi
+
+  qos_other_config="$netem_qos_latency $netem_qos_loss"
+
+  eval "$3='$qos_other_config'"
+
+  echo "netem latency: [$netem_qos_latency]"
+  echo "netem loss:    [$netem_qos_loss]"
+  echo "qos_config:    [$qos_other_config]"
 }
 
 #==================================================================================================================
-# Updates QoS - netem packet loss.
+# Updates QoS - netem (packet loss/latency)
 #==================================================================================================================
-ovs_port_qos_packet_loss_update()
+ovs_port_qos_netem_update()
 {
-  local record_uuid=""
-  local port_number=$1
-  local queue_number=0
-  local packet_loss=$2
-  local qos_type="linux-netem"
-  local other_config="loss"
+  local netem_type=$1
+  local netem_value=$2
+  local kvm_name=""
   local port_name=""
+  local port_number=-1
+  local qos_type="linux-netem"
+  local qos_config=""
 
-  # Update QoS max rate.
+  # Update netem QoS.
+  message "Updating netem qos..."
 
-  port_name="$OVS_PORT_NAME_BASE$port_number"
+  # Use "global" information.
+  kvm_name="$g_qos_info_kvm_name"
+  port_number="$g_qos_info_port_number"
+  port_name="$g_qos_info_port_name"
 
-  echo "Update port qos:"
-  echo "port number: [$table]"
-  echo "port name:   [$port_name]"
-  echo "packet loss: [$packet_loss%]"
+  echo "kvm name:    [$g_qos_info_kvm_name]"
+  echo "port name:   [$g_qos_info_port_name]"
+  echo "port number: [$g_qos_info_port_number]"
+  echo "netem:       [$netem_type]"
+  echo "value:       [$netem_value]"
 
-  # Insure uuid and latency are supplied
-  if [[ $# -eq 2 ]]; then
+  # We have some type of netem qos for the kvm, update it using
+  # new information.
+  ovs_port_qos_netem_construct $netem_type $netem_value qos_config
 
-    # Format port name
-    port_name="$OVS_PORT_NAME_BASE$port_number"
+  # Delete qos entry
+  ovs_port_qos_netem_delete $port_name
 
-    # Delete qos entry
-    ovs_port_qos_netem_delete $port_name
-
-    # Recreate the qos entry with the new value
-    ovs_port_qos_packet_loss_create $port_number $packet_loss
-
-    # Find record in "port" table
-    #table="port"
-    #condition="name=$port_name"
-    #ovs_table_find_record $table "$condition" uuid
-
-    # Get qos uuid associated with port
-    #table="port"
-    #value="qos"
-    #ovs_table_get_value $table $uuid $value qos_uuid
-
-    # Update port's qos
-    #ovs_port_qos_update $qos_uuid $other_config $packet_loss
-
-  else
-    echo "Usage: ovs_port_qos_packet_loss_update...."
-  fi
+  # Recreate the qos entry with the new value
+  ovs_port_qos_netem_add $port_number "$qos_config"
 }
 
 #==================================================================================================================
@@ -1510,7 +1442,7 @@ qos_initialize()
   for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
 
     # Create QoS record (defaulting to max ethernet rate on each port)
-    ovs_port_qos_max_rate_create "$i" $qos_default_max_rate
+    ovs_port_qos_max_rate_add "$i" $qos_default_max_rate
   done
 }
 

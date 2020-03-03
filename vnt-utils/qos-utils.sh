@@ -12,11 +12,17 @@ g_net_iface_config_file="config.env.net-iface"
 g_vnt_config_file="config.env.vnt"
 
 # QoS information (from qos table)
-qos_info_uuid=""
-qos_info_external_ids=""
-qos_info_other_config=""
-qos_info_queues=""
-qos_info_type=""
+g_qos_info_port_number=""
+g_qos_info_port_name=""
+g_qos_info_kvm_name=""
+g_qos_info_uuid=""
+g_qos_info_external_ids=""
+g_qos_info_other_config=""
+g_qos_info_queues=""
+g_qos_info_type=""
+
+# Array of "other_config"
+unset g_qos_info_other_config_array
 
 #==================================================================================================================
 #
@@ -26,21 +32,21 @@ port_log_qos_info()
   local port_name=$1
   local kvm_name="all"
 
-  # Get port name from vm name
-  port_name_to_vm_name $port_name kvm_name
-
   echo "-------------------------------------------------------------"
   echo "QoS"
   echo "-------------------------------------------------------------"
-  echo "port:         [$port_name]"
   if [[ "$port_name" != "$HOST_NETIFACE_NAME" ]]; then
-    echo "kvm:          [$kvm_name]"
+    echo "kvm:          [$g_qos_info_kvm_name]"
   fi
-  echo "_uuid:        [${qos_info_uuid}]"
-  echo "external_ids: [${qos_info_external_ids}]"
-  echo "other_config: [${qos_info_other_config}]"
-  echo "queues:       [${qos_info_queues}]"
-  echo "type:         [${qos_info_type}]"
+  echo "port number:  [$g_qos_info_port_number]"
+  echo "port:         [$g_qos_info_port_name]"
+  echo "_uuid:        [${g_qos_info_uuid}]"
+  echo "external_ids: [${g_qos_info_external_ids}]"
+  echo "other_config: [${g_qos_info_other_config}]"
+  echo "queues:       [${g_qos_info_queues}]"
+  echo "type:         [${g_qos_info_type}]"
+
+  other_config_array_list_items
   echo "-------------------------------------------------------------"
 }
 
@@ -49,20 +55,34 @@ port_log_qos_info()
 #==================================================================================================================
 port_get_qos_info()
 {
-  local pname=$1
+  local kvm_name=$1
+  local pname=""
   local qos_uuid=""
   local qos_defined=false
   local table=""
   local qos_type=""
   local other_config=""
   local queues=""
+  local pnumber=-1
+
+  message "getting qos info for kvm: [$kvm_name]"
+
+  # Get port name from kvm name
+  vm_name_to_port_name $kvm pname
+
+  # Get port number from 
+  vm_name_to_port_number $kvm pnumber
 
   # Initialize all possible qos (table) related parameters, etc.
-  qos_info_uuid=""
-  qos_info_external_ids=""
-  qos_info_other_config=""
-  qos_info_queues=""
-  qos_info_type=""
+  g_qos_info_kvm_name="$kvm_name"
+  g_qos_info_port_name="$pname"
+  g_qos_info_port_number="$pnumber"
+  g_qos_info_uuid=""
+  g_qos_info_external_ids=""
+  g_qos_info_other_config=""
+  g_qos_info_queues=""
+  g_qos_info_type=""
+  unset g_qos_info_other_config_array
 
   # Find record in "port" table
   table="port"
@@ -101,11 +121,14 @@ port_get_qos_info()
       queues=$(echo "$queues" | sed 's/}//g')
       
       # Save misc. information in globals
-      qos_info_uuid=$qos_uuid
-      qos_info_external_ids=""
-      qos_info_other_config=$other_config
-      qos_info_queues=$queues
-      qos_info_type=$qos_type
+      g_qos_info_uuid=$qos_uuid
+      g_qos_info_external_ids=""
+      g_qos_info_other_config=$other_config
+      g_qos_info_queues=$queues
+      g_qos_info_type=$qos_type
+
+      # other_config configuration items are separated by IFS
+      IFS=',' read -ra  g_qos_info_other_config_array <<< "$g_qos_info_other_config"      
     fi
   fi
 

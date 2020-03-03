@@ -15,9 +15,6 @@ g_kvm_config_file="kvm-utils.sh"
 
 q_queues_queue_list=""
 
-# Array of "other_config"
-g_array_other_config=""
-
 #==================================================================================================================
 # 
 #==================================================================================================================
@@ -96,6 +93,20 @@ port_name_to_vm_name()
 
   # Return port number to caller.
   eval "$2='$vm_name$vm_number'"
+}
+
+#==================================================================================================================
+# Convert port name to vm name (e.g. vnet0 to kvm-vnt-node1)
+#==================================================================================================================
+port_number_to_port_name()
+{
+  local port_number=$1
+  local lpname=""
+
+  lpname="$OVS_PORT_NAME_BASE$port_number"
+
+  # Return port number to caller.
+  eval "$2='$lpname'"
 }
 
 #==================================================================================================================
@@ -321,18 +332,18 @@ ovs_table_qos_item_queues_update()
 #==================================================================================================================
 #
 #==================================================================================================================
-array_list_items()
+other_config_array_list_items()
 {
   local arraylength=0
   local item=""
   local index=0
 
-  arraylength=${#g_array_other_config[@]}
+  arraylength=${#g_qos_info_other_config_array[@]}
 
   message "array contains [$arraylength] items, processing..."
 
   # Find qos queue based on port number
-  for item in "${g_array_other_config[@]}"; do
+  for item in "${g_qos_info_other_config_array[@]}"; do
 
     # Extract the queue number from the queues, a single queue value is something like:
     # 101=50ebde1e-1700-4edb-b18e-366353da3827
@@ -369,12 +380,12 @@ array_list_items_find()
   local item_value=""
 
   # Get number of configuration elements in array
-  arraylength=${#g_array_other_config[@]}
+  arraylength=${#g_qos_info_other_config_array[@]}
 
   message "Looking for [$item_name] value in array with [$arraylength] items, processing..."
 
   # Find configuration item, something like "latency="200000""
-  for item in "${g_array_other_config[@]}"; do
+  for item in "${g_qos_info_other_config_array[@]}"; do
 
     echo "item: $item"
     echo "item[$index]: [$item]"
