@@ -150,7 +150,7 @@ vnt_node_del_latency()
   vm_name_to_port_name $kvm pname
   vm_name_to_port_number $kvm pnumber
 
-  message "deleting latency from kvm: [$kvm] port: [$pname/$pnumber]..."
+  message "Deleting latency from kvm: [$kvm] port: [$pname/$pnumber]..."
 
   # Get port latency (if any)
   vnt_node_get_latency $kvm current_latency
@@ -202,15 +202,17 @@ vnt_node_set_max_rate()
 {
   local kvm=$1
   local max_rate=$2
-  local port=0
+  local pnumber=-1
   local queue_number=0;
 
+  message "kvm: [$kvm] set max-rate: [$max_rate]..." "$TEXT_VIEW_NORMAL_RED"
+
   # Get port number from vm name
-  vm_name_to_port_number $kvm port
+  vm_name_to_port_number $kvm pnumber
 
   # Construct the unique queue id for the kvm/linux-htb
   queue_number=${map_qos_type_params_partition["linux-htb"]}
-  queue_number=$((queue_number+port))
+  queue_number=$((queue_number+pnumber))
   
   # Get queue uuid (if any) associated with the kvm (max-rate information)
   ovs_port_find_qos_queue_record $port $queue_number
@@ -219,12 +221,12 @@ vnt_node_set_max_rate()
   if [[ "$g_qos_queue_record_uuid" = "" ]]; then
 
     # Create max-rate qos for kvm
-    ovs_port_qos_max_rate_add $port $max_rate
+    ovs_port_qos_max_rate_add $pnumber $max_rate
 
   else
 
     # Update max-rate qos for kvm
-    ovs_port_qos_max_rate_update $port $max_rate
+    ovs_port_qos_max_rate_update $pnumber $max_rate
   fi 
 }
 
@@ -238,7 +240,7 @@ vnt_node_del_max_rate()
   local pnumber=-1
   local command=""
 
-  message "kvm: [$kvm_name] delete max-rate..."
+  message "kvm: [$kvm_name] delete max-rate..." "$TEXT_VIEW_NORMAL_RED"
 
   # Update ovs tables
   ovs_table_qos_item_queues_update $kvm_name
