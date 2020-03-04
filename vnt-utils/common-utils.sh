@@ -206,7 +206,6 @@ ovs_table_qos_item_queues_update()
   local uuid=""
   local qos_uuid=""
   local value=""
-  local old_ifs=""
   local index=0
   local queues_added=0
   local uuid_array=""
@@ -218,6 +217,7 @@ ovs_table_qos_item_queues_update()
   local pnumber=-1
   local queues_queue=""
   local qos_queues=""
+  local remaininig_queues=0
 
   # Initialization
   q_queues_queue_list=""
@@ -252,23 +252,19 @@ ovs_table_qos_item_queues_update()
   table="qos"
   ovs_table_get_list $table $qos_uuid "queues"
   
-  # Backup IFS (this is a shell "system/environment" wide setting)
-  old_ifs=$IFS
-
   # Remove {} from qos_queues_uuid
   uuids=$(echo "$global_qos_queues_list" | sed 's/{//g')
   uuids=$(echo "$uuids" | sed 's/}//g')
 
-  # Use space as delimiter
-  IFS=' ,'
-
   # uuids are separated by IFS
-  read -ra  uuid_array <<< "$uuids"
+  IFS=' ,' read -ra  uuid_array <<< "$uuids"
 
   # Number of queues elements
   arraylength=${#uuid_array[@]}
+  remaininig_queues=$((arraylength-1))
 
   echo "processing: [$arraylength] uuids..."
+  echo "remaininig_queues: [$remaininig_queues]..."
 
   # Find qos queue based on port number
   for queues_queue in "${uuid_array[@]}"; do
@@ -289,8 +285,16 @@ ovs_table_qos_item_queues_update()
       # Update queues list    
       q_queues_queue_list=$q_queues_queue_list$queues_queue
 
+      echo "queues_queue: [$queues_queue]..."
+      echo "q_queues_queue_list: [$q_queues_queue_list]..."
+
       # Update number of queues that we are going to keep
       ((queues_added++))
+
+      # Append "," as required
+      if [[ $queues_added < $remaininig_queues ]]; then
+        q_queues_queue_list=$q_queues_queue_list","
+      fi        
 
     else
 
@@ -304,17 +308,9 @@ ovs_table_qos_item_queues_update()
       echo "queues queue item: [$queues_queue] to be removed..."
     fi
 
-    ((index++))
-    
-    # Append ", " as required
-    if [[ "$index" < "$arraylength" ]] && [[ "$arraylength" > "2" ]] && [[ "$queues_added" > "0" ]]; then
-      q_queues_queue_list=$q_queues_queue_list", "
-    fi
+    ((index++))  
 
   done
-
-  # Restore IFS
-  IFS=$old_ifs
 
   # Wrap queues list with {}
   qos_queues="{$q_queues_queue_list}"
