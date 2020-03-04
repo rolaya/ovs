@@ -1604,7 +1604,6 @@ ovs_table_get_records_uuid()
   local command=""
   local result=""
   local uuids=""
-  local old_ifs=""
   local index=1
   local pattern="s/_uuid//g"
   local delimeted_uuids=""
@@ -1634,14 +1633,8 @@ ovs_table_get_records_uuid()
   # Convert LF to "," (for use as the IFS)
   delimeted_uuids=$(echo "$uuids" | tr '\n' ',')
 
-  # Backup IFS (this is a shell "system/environment" wide setting)
-  old_ifs=$IFS
-
-  # Use space as delimiter
-  IFS=','
-
   # uuids are separated by IFS
-  read -ra  uuid_array <<< "$delimeted_uuids"
+  IFS=',' read -ra  uuid_array <<< "$delimeted_uuids"
 
   # Display all uuids
   arraylength=${#uuid_array[@]}
@@ -1656,9 +1649,6 @@ ovs_table_get_records_uuid()
 
     ((index++))
   done
-
-  # Restore IFS
-  IFS=$old_ifs
 }
 
 #==================================================================================================================
@@ -1668,6 +1658,9 @@ ovs_table_purge_records()
 {
   local table=$1
   local index=1
+
+  # Get all uuids from given table
+  ovs_table_get_records_uuid $table
 
   # Get number of records to purge from table
   arraylength=${#uuid_array[@]}
@@ -1682,6 +1675,123 @@ ovs_table_purge_records()
     echo "uuid[$index]: [$uuid]"
 
     ovs_table_delete_record $table $uuid
+
+    ((index++))
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_uuid_list_display()
+{
+  local index=1
+
+  # Get number of records
+  arraylength=${#uuid_array[@]}
+
+  message "Displaying: [$arraylength] records"
+
+  # Display all records
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    echo "uuid[$index]: [$uuid]"
+
+    ((index++))
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_list_records()
+{
+  local table=$1
+  local index=0
+
+  # Get all uuids from given table
+  ovs_table_get_records_uuid $table
+
+  # Get number of records to purge from table
+  arraylength=${#uuid_array[@]}
+
+  message "Listing: [$arraylength] uuid records from table: [$table]"
+
+  # Purge all records
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    echo "uuid[$index]: [$uuid]"
+
+    ((index++))
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_qos_table_clear_queues()
+{
+  local index=0
+  local table="qos"
+  local field="queues"
+  local queues=""
+
+  # Get all uuids from given table
+  ovs_table_get_records_uuid $table
+
+  # Get number of records to purge from table
+  arraylength=${#uuid_array[@]}
+
+  message "Clearing [$arraylength] $field records from table: [$table]"
+
+  # Purge all records
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    ovs_table_get_value $table $uuid $field queues
+
+    echo "uuid[$index]: [$uuid] port: [$queues]"
+
+    # Clear current record's qos field
+    ovs_table_clear_value $table $uuid $field
+
+    ((index++))
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_port_table_clear_qos()
+{
+  local index=0
+  local table="port"
+  local pname=""
+
+  # Get all uuids from given table
+  ovs_table_get_records_uuid $table
+
+  # Get number of records to purge from table
+  arraylength=${#uuid_array[@]}
+
+  message "Clearing [$arraylength] qos records from table: [$table]"
+
+  # Purge all records
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    ovs_table_get_value $table $uuid "name" pname
+
+    echo "uuid[$index]: [$uuid] port: [$pname]"
+
+    # Clear current record's qos field
+    ovs_table_clear_value $table $uuid "qos"
 
     ((index++))
   done

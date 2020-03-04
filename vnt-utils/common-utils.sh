@@ -128,7 +128,7 @@ ovs_table_qos_item_queues_list()
   local record_queue_number=""
   local record_uuid=""
 
-  echo "Find qos queue record uuid for port: [$port_number] queue number: [$queue_number]..."
+  echo "Find qos queue record uuid for port: [$port_number]..."
 
   # Initialize qos queue record uuid
   g_qos_queue_record_uuid=""
