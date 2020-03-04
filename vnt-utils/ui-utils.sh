@@ -57,7 +57,7 @@ note_init()
 {
   local config_item=$1
   
-  echo -e "${TEXT_VIEW_NORMAL_RED}  Note: $config_item${TEXT_VIEW_NORMAL}"
+  echo -e "${TEXT_VIEW_NORMAL_RED} Note: $config_item${TEXT_VIEW_NORMAL}"
 }
 
 #==================================================================================================================
@@ -67,7 +67,7 @@ note_add()
 {
   local config_item=$1
   
-  echo -e "${TEXT_VIEW_NORMAL_RED}        $config_item${TEXT_VIEW_NORMAL}"
+  echo -e "${TEXT_VIEW_NORMAL_RED}       $config_item${TEXT_VIEW_NORMAL}"
 }
 
 #==================================================================================================================

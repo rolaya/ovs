@@ -65,6 +65,26 @@ vnt_utils_show_menu()
   show_menu_option "vnt_node_get_packet_loss " " - VNT node get packet loss"
   show_menu_option "vnt_node_set_packet_loss " " - VNT node set packet loss"
   show_menu_option "vnt_node_del_packet_loss " " - VNT node delete packet loss"
+  echo
+
+  note_init "Set qos usage:"
+  note_add  "vnt_node_set_latency kvm-vnt-node1 100000 (sets 100ms delay)"
+  note_add  "vnt_node_set_packet_loss kvm-vnt-node1 30 (sets 30% packet loss)"
+  note_add  "vnt_node_set_max_rate kvm-vnt-node1 10000000 (sets 10Mbit/sec rate)"
+  echo
+
+  note_init "Get qos usage (-1 indicates specific qos is not configured):"
+  note_add  "vnt_node_get_latency kvm-vnt-node1"
+  note_add  "vnt_node_get_packet_loss kvm-vnt-node1"
+  note_add  "vnt_node_get_max_rate kvm-vnt-node1"
+  echo
+
+  note_init "Delete qos usage"
+  note_add  "vnt_node_del_latency kvm-vnt-node1"
+  note_add  "vnt_node_del_packet_loss kvm-vnt-node1"
+  note_add  "vnt_node_del_max_rate kvm-vnt-node1"
+  echo
+
   #show_menu_option "vnt_switch_del_qos       " " - VNT switch delete qos"
 }
 
