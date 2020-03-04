@@ -591,7 +591,9 @@ ovs_port_qos_max_rate_add()
   port_name="$OVS_PORT_NAME_BASE$port_number"
   qos_type="linux-htb"
   qos_other_config="max-rate"
-  
+
+  message "port: [$port_name] add max-rate: [$qos_other_config_value]..."
+
   ovs_port_qos_htb_create $port_name $qos_type $qos_other_config $qos_other_config_value $qos_default_max_rate
 }
 
@@ -1184,15 +1186,12 @@ ovs_port_qos_max_rate_update()
   local other_config="max-rate"
 
   # Update QoS max rate.
-
-  echo "Update port qos:"
-  echo "port number: [$table]"
-  echo "max rate:    [$port_max_rate]"
+  message "port: [$port_number] update max-rate: [$port_max_rate]..."
 
   # Insure uuid and max rate supplied (and max rate is a number)
   if [[ $# -eq 2 ]] && [[ $2 -gt 1 ]]; then
 
-    ovs_setup_qos_params "$qos_type.$other_config" $port_number
+    ovs_setup_qos_params $qos_type $port_number
     queue_number=$g_qos_queue_number
     
     # Get qos queue record uuid.

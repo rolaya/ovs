@@ -107,13 +107,16 @@ vnt_node_set_latency()
   local kvm=$1
   local latency=$2
   local pname=""
-  local port=-1
+  local pnumber=-1
   local qos_config=""
   
-  message "kvm: [$kvm] set latency: [$loss]"
+  message "kvm: [$kvm] set latency: [$latency]" "$TEXT_VIEW_NORMAL_RED"
 
   # Get current qos information for the given kvm
   vnt_node_get_qos_info $kvm
+
+  # Port number was derived above, save it
+  pnumber=$g_qos_info_port_number
 
   # "linux-netem" qos?
   if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
@@ -123,14 +126,11 @@ vnt_node_set_latency()
 
   else
   
-    # Get port number from vm name
-    vm_name_to_port_number $kvm port
-
     # Format other_config field (something like "other-config:latency:200000").
     qos_config="other-config:latency=$latency"
 
     # Add/create linux-netem (latency)
-    ovs_port_qos_netem_add $port $qos_config
+    ovs_port_qos_netem_add $pnumber $qos_config
   fi
 }
 
@@ -145,12 +145,13 @@ vnt_node_del_latency()
   local qos_config=""
   local current_loss=-1
   local current_latency=-1
+  local keep_other_config=${2:-"true"}
 
   # Get port name and number given kvm name
   vm_name_to_port_name $kvm pname
   vm_name_to_port_number $kvm pnumber
 
-  message "Deleting latency from kvm: [$kvm] port: [$pname/$pnumber]..."
+  message "Deleting latency from kvm: [$kvm] port: [$pname/$pnumber] keep other config: [$keep_other_config]..." "$TEXT_VIEW_NORMAL_RED"
 
   # Get port latency (if any)
   vnt_node_get_latency $kvm current_latency
@@ -165,7 +166,7 @@ vnt_node_del_latency()
     ovs_port_qos_netem_delete $pname
 
     # Packet loss configured, we want to keep this?
-    if [[ $current_loss != -1 ]]; then
+    if [[ $keep_other_config == "true" ]] && [[ $current_loss != -1 ]]; then
 
       # Format other_config field (something like "other-config:loss:30").
       qos_config="other-config:loss=$current_loss"
@@ -215,7 +216,7 @@ vnt_node_set_max_rate()
   queue_number=$((queue_number+pnumber))
   
   # Get queue uuid (if any) associated with the kvm (max-rate information)
-  ovs_port_find_qos_queue_record $port $queue_number
+  ovs_port_find_qos_queue_record $pnumber $queue_number
 
   # max-rate qos configured for port/kvm?
   if [[ "$g_qos_queue_record_uuid" = "" ]]; then
@@ -268,13 +269,16 @@ vnt_node_set_packet_loss()
   local kvm=$1
   local loss=$2
   local pname=""
-  local port=-1
+  local pnumber=-1
   local qos_config=""
 
-  message "kvm: [$kvm] set packet loss: [$loss]"
+  message "kvm: [$kvm] set packet loss: [$loss]" "$TEXT_VIEW_NORMAL_RED"
 
   # Get current qos information for the given kvm
   vnt_node_get_qos_info $kvm
+
+  # Port number was derived above, save it
+  pnumber=$g_qos_info_port_number
 
   # "linux-netem" qos?
   if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
@@ -284,14 +288,11 @@ vnt_node_set_packet_loss()
 
   else
   
-    # Get port number from vm name
-    vm_name_to_port_number $kvm port
-
     # Format other_config field (something like "other-config:loss:30").
     qos_config="other-config:loss=$loss"
 
     # Add/create linux-netem (latency)
-    ovs_port_qos_netem_add $port $qos_config
+    ovs_port_qos_netem_add $pnumber $qos_config
   fi
 }
 
@@ -306,12 +307,13 @@ vnt_node_del_packet_loss()
   local qos_config=""
   local current_loss=-1
   local current_latency=-1
+  local keep_other_config=${2:-"true"}
 
   # Get port name and number given kvm name
   vm_name_to_port_name $kvm pname
   vm_name_to_port_number $kvm pnumber
 
-  message "deleting packet loss from kvm: [$kvm] port: [$pname/$pnumber]..."
+  message "deleting packet loss from kvm: [$kvm] port: [$pname/$pnumber] keep other config: [$keep_other_config]..." "$TEXT_VIEW_NORMAL_RED"
 
   # Get port latency (if any)
   vnt_node_get_latency $kvm current_latency
@@ -326,7 +328,7 @@ vnt_node_del_packet_loss()
     ovs_port_qos_netem_delete $pname
 
     # Latency configured, we want to keep this?
-    if [[ $current_latency != -1 ]]; then
+    if [[ $keep_other_config == "true" ]] && [[ $current_latency != -1 ]]; then
 
       # Format other_config field (something like "other-config:latency:100000").
       qos_config="other-config:latency=$current_latency"
@@ -405,46 +407,29 @@ vnt_node_get_qos_netem()
 #==================================================================================================================
 vnt_switch_del_qos()
 {
-  local uuid=""
-  local pname=""
-  local kvm_name=""
-  local qos_uuid=""
+  # Reset "qos" field from every "port" in the system
+  ovs_port_table_clear_qos
 
-  # For now (regardless of configuration) "purge" all qos.
-  for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
-    kvm_name="kvm-vnt-node$i"
-    vnt_node_del_latency $kvm_name
-  done
+  # Reset "queues" from every "qos" in the system
+  ovs_qos_table_clear_queues
 
-  for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
-    kvm_name="kvm-vnt-node$i"
-    vnt_node_del_packet_loss $kvm_name
-  done
+  # Purge all records from "queue" table
+  ovs_table_purge_records "queue"
 
-   for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
-    kvm_name="kvm-vnt-node$i"
-    vnt_node_del_max_rate $kvm_name
-  done 
-
-  ovs_table_clear_values "port" "qos" "name=$HOST_NETIFACE_NAME"
-  
-  for ((i = $VM_NAME_INDEX_BASE; i < $NUMBER_OF_VMS; i++)) do
-
-    kvm_name="kvm-vnt-node$i"
-
-    vm_name_to_port_name $kvm_name pname
-
-    # ...
-    condition="name=$pname"
-    ovs_table_clear_values "port" "qos" "$condition"
-
-  done
-
-  # Get all record uuids from qos table
-  ovs_table_get_records_uuid "qos"
-
-  # Purge all records from qos table
+  # Purge all records from "qos" table
   ovs_table_purge_records "qos"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+ovs_table_clear_value()
+{
+  local table=$1
+  local uuid=$2
+  local column=$3
+
+  ovs_table_clear_column_values $table $uuid $column
 }
 
 #==================================================================================================================
