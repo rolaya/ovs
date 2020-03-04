@@ -1122,7 +1122,7 @@ ovs_port_qos_netem_construct()
 
   qos_other_config="$netem_qos_latency $netem_qos_loss"
 
-  eval "$3='$qos_other_config'"
+  eval "$4='$qos_other_config'"
 
   echo "netem latency: [$netem_qos_latency]"
   echo "netem loss:    [$netem_qos_loss]"
@@ -2060,7 +2060,6 @@ ovs_port_find_qos_queue_record()
   local uuid=""
   local qos_uuid=""
   local value=""
-  local old_ifs=""
   local index=0
   local uuid_array=""
   local arraylength=0
@@ -2087,18 +2086,12 @@ ovs_port_find_qos_queue_record()
   table="qos"
   ovs_table_get_list $table $qos_uuid "queues"
   
-  # Backup IFS (this is a shell "system/environment" wide setting)
-  old_ifs=$IFS
-
   # Remove {} from qos_queues_uuid
   uuids=$(echo "$global_qos_queues_list" | sed 's/{//g')
   uuids=$(echo "$uuids" | sed 's/}//g')
 
-  # Use space as delimiter
-  IFS=' ,'
-
   # uuids are separated by IFS
-  read -ra  uuid_array <<< "$uuids"
+  IFS=' ,' read -ra  uuid_array <<< "$uuids"
 
   arraylength=${#uuid_array[@]}
 
@@ -2127,9 +2120,6 @@ ovs_port_find_qos_queue_record()
     ((index++))
   
   done
-
-  # Restore IFS
-  IFS=$old_ifs
 
   echo "Qos queue record uuid for port [$port_number]: [$g_qos_queue_record_uuid]"
 }

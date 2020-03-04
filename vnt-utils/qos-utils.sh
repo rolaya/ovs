@@ -53,7 +53,25 @@ port_log_qos_info()
 #==================================================================================================================
 #
 #==================================================================================================================
-port_get_qos_info()
+vnt_node_get_qos_info()
+{
+  local kvm_name=$1
+
+  message "retrieving qos info for kvm: [$kvm_name]"
+
+  # Get linux-netem configuration (latency, packet loss)
+  vnt_node_get_qos_netem $kvm_name
+
+  # Get linux-htb configuration (max-rate)
+  vnt_node_get_qos_htb $kvm_name
+
+  other_config_array_list_items
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+vnt_node_get_qos_netem()
 {
   local kvm_name=$1
   local pname=""
@@ -65,13 +83,13 @@ port_get_qos_info()
   local queues=""
   local pnumber=-1
 
-  message "getting qos info for kvm: [$kvm_name]"
+  message "retrieving netem qos info for kvm: [$kvm_name]"
 
   # Get port name from kvm name
-  vm_name_to_port_name $kvm pname
+  vm_name_to_port_name $kvm_name pname
 
-  # Get port number from 
-  vm_name_to_port_number $kvm pnumber
+  # Get port number from kvm name
+  vm_name_to_port_number $kvm_name pnumber
 
   # Initialize all possible qos (table) related parameters, etc.
   g_qos_info_kvm_name="$kvm_name"
@@ -133,4 +151,41 @@ port_get_qos_info()
   fi
 
   port_log_qos_info $pname
+}
+
+#==================================================================================================================
+# Only handling max-rate at present.
+#==================================================================================================================
+vnt_node_get_qos_htb()
+{
+  local kvm_name=$1
+  local pnumber=-1
+  local queue_number=0
+  local other_config=""
+
+  message "retrieving htb qos info for kvm: [$kvm_name]"
+
+  # Get port number from kvm namex
+  vm_name_to_port_number $kvm_name pnumber
+
+  # Construct the unique queue id for the kvm/linux-htb
+  queue_number=${map_qos_type_params_partition["linux-htb"]}
+  queue_number=$((queue_number+port))
+  
+  # Get queue uuid (if any) associated with the kvm (max-rate information)
+  ovs_port_find_qos_queue_record $pnumber $queue_number
+
+  if [[ "$g_qos_queue_record_uuid" != "" ]]; then
+
+    # Get qos uuid associated with port
+    table="queue"
+    value="other_config"
+    ovs_table_get_value "queue" $g_qos_queue_record_uuid $value other_config
+
+    # Update qos array (all possible qos for the port/vm)
+    g_qos_info_other_config_array+=( "$other_config" )
+
+  fi
+
+  echo "Qos queue record uuid for port [$pnumber]: [$g_qos_queue_record_uuid]"
 }

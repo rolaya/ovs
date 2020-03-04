@@ -345,22 +345,7 @@ other_config_array_list_items()
   # Find qos queue based on port number
   for item in "${g_qos_info_other_config_array[@]}"; do
 
-    # Extract the queue number from the queues, a single queue value is something like:
-    # 101=50ebde1e-1700-4edb-b18e-366353da3827
-    #record_queue_number=${uuid%%=*}
-
-    echo "item: $item"
     echo "item[$index]: [$item]"
-
-    # Is this the entry we are looking for?
-    #if [[ "$record_queue_number" -eq "$queue_number" ]]; then
-
-      # Save the actual record uuid, something like:
-      # 50ebde1e-1700-4edb-b18e-366353da3827
-      #record_uuid=$(echo ${uuid:(-36)})
-      #echo "$record_uuid"
-      #g_qos_queue_record_uuid=$record_uuid
-    #fi
 
     ((index++))
   
