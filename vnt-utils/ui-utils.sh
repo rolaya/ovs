@@ -76,8 +76,8 @@ note_add()
 message()
 {
   local msg=$1
+  local color=${2:-"$TEXT_VIEW_NORMAL_BLUE"}
   
-  echo -e "${TEXT_VIEW_NORMAL_RED}$msg${TEXT_VIEW_NORMAL}"
+  echo -e "${color}$msg${TEXT_VIEW_NORMAL}"
 }
-
 

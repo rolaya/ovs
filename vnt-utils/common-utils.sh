@@ -362,7 +362,8 @@ array_list_items_find()
   local item=""
   local index=0
   local pattern="s/$item_name=//g"
-  local item_value=""
+  local item_value=-1
+  local temp_value=""
 
   # Get number of configuration elements in array
   arraylength=${#g_qos_info_other_config_array[@]}
@@ -376,13 +377,13 @@ array_list_items_find()
     echo "item[$index]: [$item]"
 
     # Given something like "latency="500000"", extract value (i.e. "500000")
-    item_value="$(echo "$item" | grep "$item_name" | sed "$pattern")"
+    temp_value="$(echo "$item" | grep "$item_name" | sed "$pattern")"
 
     # other_config configured?
-    if [[ "$item_value" != "" ]]; then
+    if [[ "$temp_value" != "" ]]; then
       
       # We are interested in the raw value (given someething ""500000"", extract "500000")
-      item_value=$(echo "$item_value" | sed 's/[^0-9]*//g')
+      item_value=$(echo "$temp_value" | sed 's/[^0-9]*//g')
 
       echo "$item_name: [$item_value]"
 
@@ -392,6 +393,8 @@ array_list_items_find()
     ((index++))
 
   done
+
+  message "Item:  [$item_name] value: [$item_value]..."
 
   eval "$2='$item_value'"
 }

@@ -170,7 +170,7 @@ vnt_node_get_qos_htb()
 
   # Construct the unique queue id for the kvm/linux-htb
   queue_number=${map_qos_type_params_partition["linux-htb"]}
-  queue_number=$((queue_number+port))
+  queue_number=$((queue_number+pnumber))
   
   # Get queue uuid (if any) associated with the kvm (max-rate information)
   ovs_port_find_qos_queue_record $pnumber $queue_number
@@ -186,6 +186,4 @@ vnt_node_get_qos_htb()
     g_qos_info_other_config_array+=( "$other_config" )
 
   fi
-
-  echo "Qos queue record uuid for port [$pnumber]: [$g_qos_queue_record_uuid]"
 }
