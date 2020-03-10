@@ -21,8 +21,8 @@ use_dhcp="False"
 # Traffic shaping specific definitions
 
 # Define some default qos values (update as per required configuration)
-# Max rate: 1GB/sec (network specific), no latency, no packet loss
-qos_default_max_rate=1000000000
+# Max rate: 10Gbit/sec (network specific), no latency, no packet loss
+qos_default_max_rate=10000000000
 qos_default_latency=1000000
 qos_default_packet_loss=0
 
