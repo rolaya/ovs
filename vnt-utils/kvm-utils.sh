@@ -321,6 +321,8 @@ kvm_import()
   local kvm_ram=$KVM_GUEST_RAM
   local kvm_size=$KVM_GUEST_SIZE
   local kvm_iso=$KVM_GUEST_ISO
+  local kvm_network_ovs=$KVM_NETWORK_OVS
+  local kvm_network_mgmt=$KVM_NETWORK_MGMT
 
   # Install guest
   command="sudo virt-install --debug
@@ -330,11 +332,30 @@ kvm_import()
                --ram=$kvm_ram
                --vcpus=1
                --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
-               --network network:$kvm_ovs_network_name
+               --network network:$kvm_network_mgmt
+               --network network:$kvm_network_ovs
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --import"
   echo "Executing: [$command]"
   $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_attach_interface()
+{
+  local command=""
+
+  command="sudo virsh attach-interface 
+                --domain kvm-vnt-node1 
+                --type network
+                --source default 
+                --model virtio
+                --config 
+                --live"
+  echo "Executing: [$command]"
+  $command                
 }
 
 #==================================================================================================================
