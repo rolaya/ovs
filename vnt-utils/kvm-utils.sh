@@ -329,19 +329,61 @@ kvm_import()
   local kvm_network_ovs=$KVM_NETWORK_OVS
   local kvm_network_mgmt=$KVM_NETWORK_MGMT
 
-  # Install guest
+  # Install/import guest
   command="sudo virt-install --debug
-               --name $kvm_name
-               --os-type=$kvm_type
-               --os-variant=$kvm_variant
-               --ram=$kvm_ram
-               --vcpus=1
-               --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
-               --network network:$kvm_network_mgmt
-               --graphics $KVM_INSTALL_OPTION_GRAPHICS
-               --import"
+              --name $kvm_name
+              --os-type=$kvm_type
+              --os-variant=$kvm_variant
+              --ram=$kvm_ram
+              --vcpus=1
+              --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
+              --network network:$kvm_network_mgmt
+              --graphics $KVM_INSTALL_OPTION_GRAPHICS
+              --import"
   echo "Executing: [$command]"
   $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_import_headless()
+{
+  local command=""
+
+  # Configuration file provided?
+  if [[ $# -eq 1 ]]; then
+    # Source provided VNT network node configuration file
+    source "$1"
+  else
+    # Source default VNT network node configuration file
+    source "$g_kvm_guest_config_file"
+  fi
+
+  # Set configuration parameters for guest KVM.
+  local kvm_name=$KVM_GUEST_NAME
+  local kvm_type=$KVM_GUEST_TYPE
+  local kvm_variant=$KVM_GUEST_VARIANT
+  local kvm_ram=$KVM_GUEST_RAM
+  local kvm_size=$KVM_GUEST_SIZE
+  local kvm_iso=$KVM_GUEST_ISO
+  local kvm_network_ovs=$KVM_NETWORK_OVS
+  local kvm_network_mgmt=$KVM_NETWORK_MGMT
+
+  # Install/import (headless)
+  command="sudo virt-install --debug
+              --name $kvm_name
+              --os-type=$kvm_type
+              --os-variant=$kvm_variant
+              --ram=$kvm_ram
+              --vcpus=1
+              --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
+              --network network:$kvm_network_mgmt
+              --nographics
+              --noautoconsole
+              --import"
+  echo "Executing: [$command]"
+  $command
 }
 
 #==================================================================================================================
@@ -354,6 +396,8 @@ qt()
   local kvm_number=-1
   local kvm_guest_config="$g_kvm_guest_config_file"
   local pattern=""
+
+  "virsh net-dhcp-leases default"
 }
 
 #==================================================================================================================
@@ -371,7 +415,7 @@ kvm_guest_configuration_update()
   if [[ "$kvm_name" != "" ]]; then  
 
     # Get KVM number from KVM name
-    port_name_to_vm_number $kvm_name kvm_number
+    vm_name_to_vm_number $kvm_name kvm_number
     
     # Format search/replace pattern, we want to replace something like kvm-vnt-nodeX 
     # with like kvm-vnt-node1.
@@ -408,7 +452,13 @@ kvm_reprovision_net_interfaces()
     kvm_guest_configuration_update $kvm_name
 
     # Import the KVM with new configuration
-    kvm_import $kvm_guest_config
+    kvm_import_headless $kvm_guest_config
+
+    # We need the KVM running to be able to add another network interface 
+    # (and the import process launched the KVM, so attach new interace).
+    # Note: this KVM/libvirt framework mechanism may be explored for "other"
+    # functionality (KVM updates of other kinds).
+    kvm_attach_interface $kvm_name
 
   else
     message "usage: kvm_reprovision_net_interfaces kvm-name" $TEXT_VIEW_NORMAL_RED
@@ -424,6 +474,10 @@ kvm_attach_interface()
   local command=""
 
   if [[ "$kvm_name" != "" ]]; then  
+
+    message "adding management interface to kvm: [$kvm_name]" $TEXT_VIEW_NORMAL_GREEN
+
+    # Attach the management interface to the KVM, this will allow us to ssh, etc into the KVM
     command="sudo virsh attach-interface 
                   --domain $kvm_name
                   --type network
@@ -433,6 +487,7 @@ kvm_attach_interface()
                   --live"
     echo "Executing: [$command]"
     $command
+
   else
     message "usage: kvm_attach_interface kvm-name" $TEXT_VIEW_NORMAL_RED
   fi  

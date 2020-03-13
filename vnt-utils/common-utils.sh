@@ -3,6 +3,9 @@
 # Generic/common UI utils
 source "ui-utils.sh"
 
+# VNT configuration file.
+g_vnt_config_file="config.env.vnt"
+
 ###################################################################################################################
 # The global OVS configuration file.
 g_ovs_config_file="ovs-utils.sh"
@@ -33,6 +36,26 @@ vm_name_to_port_number()
 
   # Return port number to caller.
   eval "$2='$port_number'"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vm_name_to_vm_number()
+{
+  local xname=$1
+  local xnumber=-1
+  local pattern="s/${VM_BASE_NAME}//g"
+
+  # Given a KVM node name (e.g. kvm-vnt-node1) return its port number (1 less than the name index)
+  xnumber=$(echo "$xname" | sed "$pattern")
+
+  echo "kvm base name: [$VM_BASE_NAME]"
+  echo "kvm name:      [$xname]"
+  echo "kvm number:    [$xnumber]"
+
+  # Return kvm number to caller.
+  eval "$2='$xnumber'"
 }
 
 #==================================================================================================================
@@ -394,3 +417,16 @@ array_list_items_find()
 
   eval "$2='$item_value'"
 }
+
+#==================================================================================================================
+#
+#=================================================================================================================
+function common_read_configuration()
+{
+  # Source VNT configuration
+  source "$g_vnt_config_file"
+}
+
+# Provision environment based on configuration file
+common_read_configuration
+
