@@ -298,6 +298,20 @@ kvm_install()
   $command                 
 }
 
+  # Install guest
+  #command="sudo virt-install --debug
+   #            --name $kvm_name
+    #           --os-type=$kvm_type
+     #          --os-variant=$kvm_variant
+      #         --ram=$kvm_ram
+       #        --vcpus=1
+        #       --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
+         #      --network network:$kvm_network_mgmt
+          #     --network network:$kvm_network_ovs
+           #    --graphics $KVM_INSTALL_OPTION_GRAPHICS
+            #   --import"
+  #echo "Executing: [$command]"
+
 #==================================================================================================================
 #
 #==================================================================================================================
@@ -333,7 +347,6 @@ kvm_import()
                --vcpus=1
                --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
                --network network:$kvm_network_mgmt
-               --network network:$kvm_network_ovs
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
                --import"
   echo "Executing: [$command]"
@@ -345,17 +358,106 @@ kvm_import()
 #==================================================================================================================
 kvm_attach_interface()
 {
+  local kvm_name=$1
   local command=""
 
-  command="sudo virsh attach-interface 
-                --domain kvm-vnt-node1 
-                --type network
-                --source default 
-                --model virtio
-                --config 
-                --live"
-  echo "Executing: [$command]"
-  $command                
+  if [[ "$kvm_name" != "" ]]; then  
+    command="sudo virsh attach-interface 
+                  --domain $kvm_name
+                  --type network
+                  --source kvm-ovs-network
+                  --model virtio
+                  --config 
+                  --live"
+    echo "Executing: [$command]"
+    $command
+  else
+    message "usage: kvm_attach_interface kvm-name" $TEXT_VIEW_NORMAL_RED
+  fi  
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_get_iface_info()
+{
+  local kvm_name=$1
+  local command=""
+
+  if [[ "$kvm_name" != "" ]]; then  
+    command="sudo virsh domiflist $kvm_name"
+    echo "Executing: [$command]"
+    $command
+  else
+    message "usage: kvm_get_iface_info kvm-name" $TEXT_VIEW_NORMAL_RED
+  fi  
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_get_ovs_port()
+{
+  local kvm_name=$1
+  local command=""
+  local iface_info=""
+  local iface=""
+  local iface_info_delimeted=""
+  local pattern="s/kvm-ovs-network//g"
+  local iface_info_array=""
+  local array_len=0
+  local index=0
+
+  unset iface_info_array
+
+#      item_value=$(echo "$temp_value" | sed 's/[^0-9]*//g')
+
+  if [[ "$kvm_name" != "" ]]; then  
+    command="sudo virsh domiflist $kvm_name"
+    echo "Executing: [$command]"
+    iface_info="$($command)"
+
+    echo "askdhasdjha $iface_info"
+
+      # Convert LF to space (for use as the IFS)
+      iface_info_delimeted=$(echo "$iface_info" | tr '\n' ',')
+
+      # uuids are separated by IFS
+      IFS=',' read -ra  iface_info_array <<< "$iface_info_delimeted"
+
+  array_len=${#iface_info_array[@]}
+
+  echo "processing: [$array_len] uuids..."
+
+  # Find qos queue based on port number
+  for iface in "${iface_info_array[@]}"; do
+
+    #echo "queue number: ${uuid%%=*} $record_queue_number"
+    echo "iface[$index]: [$iface]"
+
+    # Extract the queue number from the queues, a single queue value is something like:
+    # 101=50ebde1e-1700-4edb-b18e-366353da3827
+    #record_queue_number=${uuid%%=*}
+
+    #echo "queue number: ${uuid%%=*} $record_queue_number"
+    #echo "uuid[$index]: [$uuid]"
+
+    # Is this the entry we are looking for?
+    #if [[ "$record_queue_number" -eq "$queue_number" ]]; then
+
+      # Save the actual record uuid, something like:
+      # 50ebde1e-1700-4edb-b18e-366353da3827
+      #record_uuid=$(echo ${uuid:(-36)})
+      #echo "$record_uuid"
+      #g_qos_queue_record_uuid=$record_uuid
+    #fi
+
+    ((index++))
+  
+  done      
+  else
+    message "usage: kvm_get_iface_info kvm-name" $TEXT_VIEW_NORMAL_RED
+  fi  
 }
 
 #==================================================================================================================
