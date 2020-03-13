@@ -156,6 +156,21 @@ kvm_start()
 #==================================================================================================================
 # 
 #==================================================================================================================
+kvm_start_headless()
+{
+  local command=""
+  local kvm=${1:-$KVM_GUEST_NAME}
+
+  message "starting headless kvm: [$kvm]" $TEXT_VIEW_NORMAL_GREEN
+
+  command="sudo virsh start --force-boot $kvm"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 kvm_shutdown()
 {
   local command=""
@@ -233,11 +248,9 @@ kvm_snapshot_list()
 #==================================================================================================================
 kvm_vm_start()
 {
-  local command=""
+  local kvm_name=${1:-$KVM_GUEST_NAME}
 
-  command="sudo virsh start --console --force-boot $KVM_HOST_NAME"
-  echo "Executing: [$command]"
-  $command
+  kvm_start $kvm_name
 }
 
 #==================================================================================================================
@@ -524,56 +537,67 @@ kvm_get_ovs_port()
   local iface_info_array=""
   local array_len=0
   local index=0
+  local iface_config_array=""
+  local iface_config_value=""
+  local temp_value=""
 
+  # Init
   unset iface_info_array
+  unset iface_config_array
 
-#      item_value=$(echo "$temp_value" | sed 's/[^0-9]*//g')
+  # Insure kvm name is provided
+  if [[ "$kvm_name" != "" ]]; then
 
-  if [[ "$kvm_name" != "" ]]; then  
+    # get kvm network interface list
     command="sudo virsh domiflist $kvm_name"
     echo "Executing: [$command]"
     iface_info="$($command)"
 
-    echo "askdhasdjha $iface_info"
+    # Convert LF to , (for use as the IFS)
+    iface_info_delimeted=$(echo "$iface_info" | tr '\n' ',')
 
-      # Convert LF to space (for use as the IFS)
-      iface_info_delimeted=$(echo "$iface_info" | tr '\n' ',')
+    # Some records will be actual interface information, some will be comments
+    # and headers for example and interface entry will look somethig like:
+    # "vnet1      bridge     kvm-ovs-network virtio      52:54:00:d8:7e:f3"
+    IFS=',' read -ra  iface_info_array <<< "$iface_info_delimeted"
 
-      # uuids are separated by IFS
-      IFS=',' read -ra  iface_info_array <<< "$iface_info_delimeted"
+    array_len=${#iface_info_array[@]}
 
-  array_len=${#iface_info_array[@]}
+    echo "processing: [$array_len] uuids..."
 
-  echo "processing: [$array_len] uuids..."
+    # Find qos queue based on port number
+    for iface in "${iface_info_array[@]}"; do
 
-  # Find qos queue based on port number
-  for iface in "${iface_info_array[@]}"; do
+      #echo "queue number: ${uuid%%=*} $record_queue_number"
+      echo "iface[$index]: [$iface]"
 
-    #echo "queue number: ${uuid%%=*} $record_queue_number"
-    echo "iface[$index]: [$iface]"
+      temp_value=""
 
-    # Extract the queue number from the queues, a single queue value is something like:
-    # 101=50ebde1e-1700-4edb-b18e-366353da3827
-    #record_queue_number=${uuid%%=*}
+      # Search for "kvm-ovs-network" in current entry
+      temp_value="$(echo "$iface" | grep "$kvm_ovs_network_name")"
 
-    #echo "queue number: ${uuid%%=*} $record_queue_number"
-    #echo "uuid[$index]: [$uuid]"
+      # Found OVS/QoS management interface?
+      if [[ "$temp_value" != "" ]]; then
 
-    # Is this the entry we are looking for?
-    #if [[ "$record_queue_number" -eq "$queue_number" ]]; then
+        # Read all values into array. We expect the values to be in this order:
+        # "Interface Type Source Model MAC". We are intersted in the "Interface",
+        # something like vnet1 (this is the OVS port we apply QoS to).
+        read -a iface_config_array <<< $iface
 
-      # Save the actual record uuid, something like:
-      # 50ebde1e-1700-4edb-b18e-366353da3827
-      #record_uuid=$(echo ${uuid:(-36)})
-      #echo "$record_uuid"
-      #g_qos_queue_record_uuid=$record_uuid
-    #fi
+        # For informational purposes, display all values
+        for iface_config_value in "${iface_config_array[@]}"; do
+          echo "iface config: [$iface_config_value]"
+        done
+
+        echo "kvm: [$kvm_name] QoS port number: [${iface_config_array[0]}]"
+
+      fi
 
     ((index++))
   
   done      
   else
-    message "usage: kvm_get_iface_info kvm-name" $TEXT_VIEW_NORMAL_RED
+    message "usage: kvm_get_ovs_port kvm-name" $TEXT_VIEW_NORMAL_RED
   fi  
 }
 
