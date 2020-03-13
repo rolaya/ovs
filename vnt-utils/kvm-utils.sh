@@ -3,6 +3,11 @@
 # Generic/common UI utils
 source "ui-utils.sh"
 
+###################################################################################################################
+# Common global utils file.
+g_common_config_file="common-utils.sh"
+###################################################################################################################
+
 # VNT configuration file.
 g_vnt_config_file="config.env.vnt"
 
@@ -298,20 +303,6 @@ kvm_install()
   $command                 
 }
 
-  # Install guest
-  #command="sudo virt-install --debug
-   #            --name $kvm_name
-    #           --os-type=$kvm_type
-     #          --os-variant=$kvm_variant
-      #         --ram=$kvm_ram
-       #        --vcpus=1
-        #       --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
-         #      --network network:$kvm_network_mgmt
-          #     --network network:$kvm_network_ovs
-           #    --graphics $KVM_INSTALL_OPTION_GRAPHICS
-            #   --import"
-  #echo "Executing: [$command]"
-
 #==================================================================================================================
 #
 #==================================================================================================================
@@ -356,6 +347,77 @@ kvm_import()
 #==================================================================================================================
 #
 #==================================================================================================================
+qt()
+{
+  local kvm_name=$1
+  local command=""
+  local kvm_number=-1
+  local kvm_guest_config="$g_kvm_guest_config_file"
+  local pattern=""
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_guest_configuration_update()
+{
+  local kvm_name=$1
+  local command=""
+  local kvm_number=-1
+  local kvm_guest_config="$g_kvm_guest_config_file"
+  local pattern=""
+
+  # Insure KVM name is provided
+  if [[ "$kvm_name" != "" ]]; then  
+
+    # Get KVM number from KVM name
+    port_name_to_vm_number $kvm_name kvm_number
+    
+    # Format search/replace pattern, we want to replace something like kvm-vnt-nodeX 
+    # with like kvm-vnt-node1.
+    pattern="s/${VM_BASE_NAME}[0-9]/${VM_BASE_NAME}$kvm_number/g"
+
+    # User feedback
+    message "updating configuration file: [$kvm_guest_config], pattern: [$pattern]"
+
+    # Update "generic" guest configuration file (just replacing the KVM name (for now))
+    sed -i "$pattern" $kvm_guest_config
+
+  else
+    message "usage: kvm_reprovision_net_interfaces kvm-name" $TEXT_VIEW_NORMAL_RED
+  fi    
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_reprovision_net_interfaces()
+{
+  local kvm_name=$1
+  local command=""
+  local kvm_guest_config="$g_kvm_guest_config_file"
+
+  if [[ "$kvm_name" != "" ]]; then  
+
+    # Undefine given KVM
+    command="sudo virsh undefine $kvm_name"
+    echo "Executing: [$command]"
+    $command
+
+    # Update guest configuration file
+    kvm_guest_configuration_update $kvm_name
+
+    # Import the KVM with new configuration
+    kvm_import $kvm_guest_config
+
+  else
+    message "usage: kvm_reprovision_net_interfaces kvm-name" $TEXT_VIEW_NORMAL_RED
+  fi    
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
 kvm_attach_interface()
 {
   local kvm_name=$1
@@ -365,7 +427,7 @@ kvm_attach_interface()
     command="sudo virsh attach-interface 
                   --domain $kvm_name
                   --type network
-                  --source kvm-ovs-network
+                  --source $KVM_NETWORK_OVS
                   --model virtio
                   --config 
                   --live"
@@ -550,6 +612,9 @@ kvm_img_pool_delete()
 #=================================================================================================================
 function kvm_read_configuration()
 {
+  # Source common helpers
+  source "$g_common_config_file"
+
   # Source VNT configuration
   source "$g_vnt_config_file"
 
