@@ -540,6 +540,7 @@ kvm_get_ovs_port()
   local iface_config_array=""
   local iface_config_value=""
   local temp_value=""
+  local port_name=""
 
   # Init
   unset iface_info_array
@@ -589,7 +590,9 @@ kvm_get_ovs_port()
           echo "iface config: [$iface_config_value]"
         done
 
-        echo "kvm: [$kvm_name] QoS port number: [${iface_config_array[0]}]"
+        # Get the port name
+        port_name=${iface_config_array[0]}
+        echo "kvm: [$kvm_name] QoS port name: [$port_name]"
 
       fi
 
@@ -598,7 +601,95 @@ kvm_get_ovs_port()
   done      
   else
     message "usage: kvm_get_ovs_port kvm-name" $TEXT_VIEW_NORMAL_RED
-  fi  
+  fi
+
+  eval "$2='$port_name'"
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_get_ip_address()
+{
+  local kvm_name=$1
+  local net_name=$2
+  local command=""
+  local dhcp_info=""
+  local ip_address=""
+  local dhcp_lease=""
+  local dhcp_info_delimeted=""
+  local pattern="s/$kvm_name//g"
+  local dhcp_info_array=""
+  local array_len=0
+  local index=0
+  local dhcp_config_array=""
+  local dhcp_config_value=""
+  local temp_value=""
+
+  # Init
+  unset dhcp_info_array
+  unset dhcp_config_array
+
+  # Insure kvm name and network name are provided
+  if [[ "$kvm_name" != "" ]] && [[ "$net_name" != "" ]]; then
+
+    # Get dhcp lease list the entries are something like:
+    # "Expiry Time         MAC address        Protocol IP address          Hostname       Client ID or DUID"
+    # 2020-03-14 00:25:19  52:54:00:65:ba:9f  ipv4     192.168.122.150/24  kvm-vnt-node1  -
+    command="sudo virsh net-dhcp-leases $net_name"
+    echo "Executing: [$command]"
+    dhcp_info="$($command)"
+
+    # Convert LF to , (for use as the IFS)
+    dhcp_info_delimeted=$(echo "$dhcp_info" | tr '\n' ',')
+
+    # Some records will be actual dhcp lease information, some will be comments
+    # and headers.
+    IFS=',' read -ra  dhcp_info_array <<< "$dhcp_info_delimeted"
+
+    array_len=${#dhcp_info_array[@]}
+
+    echo "processing: [$array_len] dhcp lease entries..."
+
+    # Find dhcp lease for given kvm
+    for dhcp_lease in "${dhcp_info_array[@]}"; do
+
+      echo "dhcp lease[$index]: [$dhcp_lease]"
+
+      temp_value=""
+
+      # Search for "kvm-vnt-node1" (for example) in current entry
+      temp_value="$(echo "$dhcp_lease" | grep "$kvm_name")"
+
+      # Found OVS/QoS management interface?
+      if [[ "$temp_value" != "" ]]; then
+
+        # Read all values into array. We expect the values to be in this order:
+        # "Expiry Time  MAC address  Protocol IP address  Hostname  Client ID or DUID"
+        read -a dhcp_config_array <<< $dhcp_lease
+
+        # For informational purposes, display all values
+        for dhcp_config_value in "${dhcp_config_array[@]}"; do
+          echo "dhcp config: [$dhcp_config_value]"
+        done
+
+        # Get the ip address
+        ip_address=${dhcp_config_array[4]}
+        ip_address="${ip_address%/*}"
+
+        echo "kvm: [$kvm_name] ip address: [$ip_address]"
+
+      fi
+
+    ((index++))
+  
+    done
+
+  else
+    message "usage: kvm_get_ip_address kvm-name net-name" $TEXT_VIEW_NORMAL_RED
+  fi
+
+  eval "$3='$ip_address'"
 }
 
 #==================================================================================================================

@@ -24,14 +24,17 @@ q_queues_queue_list=""
 vm_name_to_port_number()
 {
   local kvm_name=$1
+  local port_name=""
   local port_number=0
-  local pattern="s/${VM_BASE_NAME}//g"
+  local pattern="s/${OVS_PORT_NAME_BASE}//g"
+
+  vm_name_to_port_name $kvm_name port_name
 
   # Given a KVM node name (e.g. kvm-vnt-node1) return its port number (1 less than the name index)
-  port_number=$(echo "$kvm_name" | sed "$pattern")
-  port_number=$((port_number-1))
+  port_number=$(echo "$port_name" | sed "$pattern")
 
   echo "kvm name:    [$kvm_name]"
+  echo "port name:   [$port_name]"
   echo "port number: [$port_number]"
 
   # Return port number to caller.
@@ -63,59 +66,17 @@ vm_name_to_vm_number()
 #==================================================================================================================
 vm_name_to_port_name()
 {
-  local kvm_name=$1
-  local pnumber=0
-  local port_name=""
+  local x_kname=$1
+  local x_pname=""
 
-  # Given KVM name, gets its corresponding port number
-  vm_name_to_port_number $kvm_name pnumber
-
-  # Format the port name for the KVM (something like "vnet0")
-  port_name="$OVS_PORT_NAME_BASE$pnumber"
+  # Get port number based on kvm name (this is based on "live" information).
+  kvm_get_ovs_port $x_kname x_pname
   
-  echo "node name: [$kvm_name]"
-  echo "port name: [$port_name]"
+  echo "kvm name:  [$x_kname]"
+  echo "port name: [$x_pname]"
 
   # Return port name to caller.
-  eval "$2='$port_name'"
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-port_name_to_vm_number()
-{
-  local port_name=$1
-  local port_number=0
-  local pattern="s/${OVS_PORT_NAME_BASE}//g"
-
-  # Given a port name (e.g. vnet0) return its vm number (1 more tnan the name index)
-  port_number=$(echo "$port_name" | sed "$pattern")
-  port_number=$((port_number+1))
-
-  # Return port number to caller.
-  eval "$2='$port_number'"
-}
-
-#==================================================================================================================
-# Convert port name to vm name (e.g. vnet0 to kvm-vnt-node1)
-#==================================================================================================================
-port_name_to_vm_name()
-{
-  local port_name=$1
-  local vm_name=""
-  local vm_number=-1
-  local pattern="s/${OVS_PORT_NAME_BASE}/${VM_BASE_NAME}/g"
-
-  # Given port name vnetx (e.g. vnet0) return index+1
-  port_name_to_vm_number $port_name vm_number
-
-  # Given port name vnetx (e.g. vnet0) return "kvm-vnt-node"
-  vm_name=$(echo "$port_name" | sed "$pattern")
-  vm_name=$(echo "$vm_name" | sed 's/[0-9]//g')
-
-  # Return port number to caller.
-  eval "$2='$vm_name$vm_number'"
+  eval "$2='$x_pname'"
 }
 
 #==================================================================================================================

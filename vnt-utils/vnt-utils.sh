@@ -53,6 +53,7 @@ vnt_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL}"
   show_menu_option "vnt_node_list            " " - VNT node list"
   show_menu_option "vnt_node_start           " " - VNT node start"
+  show_menu_option "vnt_node_start_headless  " " - VNT node start"
   show_menu_option "vnt_node_shutdown        " " - VNT node shutdown"
   show_menu_option "vnt_node_get_latency     " " - VNT node get latency"
   show_menu_option "vnt_node_set_latency     " " - VNT node set latency"
@@ -106,6 +107,18 @@ vnt_node_start()
   message "Starting VNT node: [$kvm]"
   
   kvm_start $kvm
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_start_headless()
+{
+  local kvm=$1
+
+  message "Starting VNT node: [$kvm]"
+  
+  kvm_start_headless $kvm
 }
 
 #==================================================================================================================
