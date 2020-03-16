@@ -624,7 +624,6 @@ ovs_port_qos_htb_create()
   local qos_defined=false
   local linux_htb_qos_record_uuid=""
   local linux_htb_queue_record_uuid=""
-  local old_ifs=""
   local table=""
   local qos=""
   local port_number=0
@@ -703,21 +702,12 @@ ovs_port_qos_htb_create()
       echo "excuting: [$command]"
       uuids="$($command)"
 
-      # Backup IFS (this is a "system/environment" wide setting)
-      old_ifs=$IFS
-
       # Convert LF to space (for use as the IFS)
       delimeted_uuids=$(echo "$uuids" | tr '\n' ' ')
 
-      # Use space as delimiter
-      IFS=' '
-
       # uuids are separated by IFS
-      read -ra  uuid_array <<< "$delimeted_uuids"
+      IFS=' ' read -ra  uuid_array <<< "$delimeted_uuids"
       
-      # Restore IFS
-      IFS=$old_ifs
-
       # (for debugging) save the uuid of the qos, queue records
       linux_htb_qos_record_uuid="${uuid_array[0]}"
       linux_htb_queue_record_uuid="${uuid_array[1]}"
@@ -762,6 +752,30 @@ ovs_port_qos_htb_create()
     echo "Usage:    ovs_port_qos_htb_create qos_type qos_other_config qos_other_config_value qos_default_max_rate..."
     echo "Example: \"ovs_port_qos_htb_create tap_port1 linux-htm max-rate 10000000 1000000000\""
   fi
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+ovs_port_qos_ingress_create()
+{
+  local command=""
+  local interface=$1
+  local max_rate=$2
+  local max_rate_mbps=0
+
+  # Rate expected in Mbps
+  max_rate_mbps=$((max_rate/1000))
+
+  message "Creating ingress policing rate:"
+  echo "port:          [$interface]"
+  echo "max rate:      [$max_rate]"
+  echo "max rate:      [$max_rate_mbps]"
+
+  # Configure ingress policing (required for vnt private network max-rate qos)
+  command="sudo ovs-vsctl set interface $interface ingress_policing_rate=$max_rate_mbps"
+  echo "excuting: [$command]"
+  $command
 }
 
 #==================================================================================================================
@@ -934,6 +948,44 @@ ovs_port_qos_netem_delete()
 
   else
     echo "Usage: ovs_port_qos_netem_delete port (e.g. ovs_port_qos_netem_delete vnet0)..."
+  fi
+}
+
+#==================================================================================================================
+# Delete ingress policing rate configuration
+#==================================================================================================================
+ovs_port_qos_ingress_policing_rate_delete()
+{
+  local ovs_port=$1
+  local table="interface"
+  local condition=""
+  local uuid=""
+  local column=""
+  local value="0"
+
+  message "deleting interface: [$ovs_port] ingress policing rate..."
+
+  # Insure port (interface) is supplied (something like vnet1)
+  if [[ $# -eq 1 ]]; then
+
+    condition="name=$ovs_port"
+
+    # Find record in "interface" table.
+    ovs_table_find_record $table "$condition" uuid
+
+    if [[ "$uuid" != "" ]]; then
+
+      column="ingress_policing_rate"
+      
+      # Set the ingress policing rate
+      ovs_table_set_value $table $uuid $column $value
+
+    else
+      echo -e "${TEXT_VIEW_NORMAL_BLUE}Warning: record [$condition] not found in table: [$table]${TEXT_VIEW_NORMAL}"
+    fi
+
+  else
+    echo "Usage: ovs_port_qos_ingress_policing_rate_delete port (e.g. ovs_port_qos_ingress_policing_rate_delete vnet0)..."
   fi
 }
 

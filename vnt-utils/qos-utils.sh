@@ -65,6 +65,9 @@ vnt_node_get_qos_info()
   # Get linux-htb configuration (max-rate)
   vnt_node_get_qos_htb $kvm_name
 
+  # Get ingress policing rate configuration
+  vnt_node_get_qos_ingress_policing_rate $kvm_name
+
   other_config_array_list_items
 }
 
@@ -187,3 +190,47 @@ vnt_node_get_qos_htb()
 
   fi
 }
+
+#==================================================================================================================
+#
+#==================================================================================================================
+vnt_node_get_qos_ingress_policing_rate()
+{
+  local kvm_name=$1
+  local pname=""
+  local table=""
+  local pnumber=-1
+  local ingress_policing_rate=-1
+
+  message "retrieving ingress policing rate info for kvm: [$kvm_name]"
+
+  # Get port name from kvm name
+  vm_name_to_port_name $kvm_name pname
+
+  # Get port number from kvm name
+  vm_name_to_port_number $kvm_name pnumber
+
+  # Initialize all possible qos (table) related parameters, etc.
+  g_qos_info_kvm_name="$kvm_name"
+  g_qos_info_port_name="$pname"
+  g_qos_info_port_number="$pnumber"
+  unset g_qos_info_other_config_array
+
+  # Find record in "interface" table
+  table="interface"
+  condition="name=$pname"
+  ovs_table_find_record $table "$condition" uuid
+
+  # Ingress policing rate configured?
+  if [[ "$uuid" != "" ]]; then
+
+    # Get qos uuid associated with port
+    ovs_table_get_value $table $uuid "ingress_policing_rate" ingress_policing_rate
+
+    # Update qos array (all possible qos for the port/vm)
+    g_qos_info_other_config_array+=( "ingress_policing_rate:$ingress_policing_rate" )    
+  fi
+
+  port_log_qos_info $pname
+}
+

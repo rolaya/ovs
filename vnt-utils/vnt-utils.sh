@@ -53,7 +53,7 @@ vnt_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL}"
   show_menu_option "vnt_node_list             " " - VNT node list"
   show_menu_option "vnt_nodes_start           " " - VNT nodes start"
-  show_menu_option "vnt_nodes_stop            " " - VNT nodes stop"
+  show_menu_option "vnt_nodes_shutdown        " " - VNT nodes shutdown"
   show_menu_option "vnt_nodes_show_ip_address " " - VNT nodes show management interface ip address"
   show_menu_option "vnt_node_start            " " - VNT node start"
   show_menu_option "vnt_node_start_headless   " " - VNT node start"
@@ -69,6 +69,11 @@ vnt_utils_show_menu()
   show_menu_option "vnt_node_get_packet_loss  " " - VNT node get packet loss"
   show_menu_option "vnt_node_set_packet_loss  " " - VNT node set packet loss"
   show_menu_option "vnt_node_del_packet_loss  " " - VNT node delete packet loss"
+
+  show_menu_option "vnt_node_get_ingress_policing_rate " " - VNT node get ingress policing rate"
+  show_menu_option "vnt_node_set_ingress_policing_rate " " - VNT node set ingress policing rate"
+  show_menu_option "vnt_node_del_ingress_policing_rate " " - VNT node delete ingress policing rate"
+
   echo
 
   note_init "Set qos usage:"
@@ -350,11 +355,74 @@ vnt_node_del_max_rate()
 
   command=`sudo ovs-ofctl del-flows br0 "in_port=$pnumber"`
   echo "excuting: [$command]"
-  $comman
+  $command
 
   command=`sudo ovs-ofctl del-flows br0 "in_port=$pname"`
   echo "excuting: [$command]"
-  $comman
+  $command
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_get_ingress_policing_rate()
+{
+  local kvm=$1
+  local xrate=-1
+  
+  message "Get ingress policing rate for kvm: [$kvm]..." "$TEXT_VIEW_NORMAL_RED"
+
+  # Get qos information for the node
+  vnt_node_get_qos_info $kvm
+
+  # Get ingress policing rate (if any) 
+  array_list_items_find "ingress_policing_rate" xrate
+
+  eval "$2='$xrate'"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_set_ingress_policing_rate()
+{
+  local kvm=$1
+  local max_rate=$2
+  local pnumber=-1
+
+  message "kvm: [$kvm] set ingress policing rate: [$max_rate]..." "$TEXT_VIEW_NORMAL_RED"
+
+  # Get port name from vm name
+  vm_name_to_port_name $kvm pnumber
+
+  # Create ingress policing rate
+  ovs_port_qos_ingress_create $pnumber $max_rate
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_node_del_ingress_policing_rate()
+{
+  local kvm=$1
+  local pname=""
+  local command=""
+  local rate=-1
+
+  # Get port name given kvm name
+  vm_name_to_port_name $kvm pname
+
+  message "kvm: [$kvm/$pname] delete ingress policing rate..." "$TEXT_VIEW_NORMAL_RED"
+
+  # Get port packet loss (if any)
+  vnt_node_get_ingress_policing_rate $kvm rate
+
+  # Ingress policing rate configured?
+  if [[ $rate != -1 ]]; then
+    
+    # Delete ingress policing rate from interface
+    ovs_port_qos_ingress_policing_rate_delete $pname
+  fi
 }
 
 #==================================================================================================================
@@ -514,6 +582,8 @@ vnt_switch_del_qos()
 
   # Purge all records from "qos" table
   ovs_table_purge_records "qos"
+
+  #rolaya
 }
 
 #==================================================================================================================
