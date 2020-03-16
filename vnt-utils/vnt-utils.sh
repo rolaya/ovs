@@ -51,21 +51,24 @@ vnt_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM guest management"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "vnt_node_list            " " - VNT node list"
-  show_menu_option "vnt_node_start           " " - VNT node start"
-  show_menu_option "vnt_node_start_headless  " " - VNT node start"
-  show_menu_option "vnt_node_shutdown        " " - VNT node shutdown"
-  show_menu_option "vnt_node_get_latency     " " - VNT node get latency"
-  show_menu_option "vnt_node_set_latency     " " - VNT node set latency"
-  show_menu_option "vnt_node_del_latency     " " - VNT node delete latency"
+  show_menu_option "vnt_node_list             " " - VNT node list"
+  show_menu_option "vnt_nodes_start           " " - VNT nodes start"
+  show_menu_option "vnt_nodes_stop            " " - VNT nodes stop"
+  show_menu_option "vnt_nodes_show_ip_address " " - VNT nodes show management interface ip address"
+  show_menu_option "vnt_node_start            " " - VNT node start"
+  show_menu_option "vnt_node_start_headless   " " - VNT node start"
+  show_menu_option "vnt_node_shutdown         " " - VNT node shutdown"
+  show_menu_option "vnt_node_get_latency      " " - VNT node get latency"
+  show_menu_option "vnt_node_set_latency      " " - VNT node set latency"
+  show_menu_option "vnt_node_del_latency      " " - VNT node delete latency"
 
-  show_menu_option "vnt_node_get_max_rate    " " - VNT node get max rate"
-  show_menu_option "vnt_node_set_max_rate    " " - VNT node set max rate"
-  show_menu_option "vnt_node_del_max_rate    " " - VNT node delete max rate"
+  show_menu_option "vnt_node_get_max_rate     " " - VNT node get max rate"
+  show_menu_option "vnt_node_set_max_rate     " " - VNT node set max rate"
+  show_menu_option "vnt_node_del_max_rate     " " - VNT node delete max rate"
 
-  show_menu_option "vnt_node_get_packet_loss " " - VNT node get packet loss"
-  show_menu_option "vnt_node_set_packet_loss " " - VNT node set packet loss"
-  show_menu_option "vnt_node_del_packet_loss " " - VNT node delete packet loss"
+  show_menu_option "vnt_node_get_packet_loss  " " - VNT node get packet loss"
+  show_menu_option "vnt_node_set_packet_loss  " " - VNT node set packet loss"
+  show_menu_option "vnt_node_del_packet_loss  " " - VNT node delete packet loss"
   echo
 
   note_init "Set qos usage:"
@@ -95,6 +98,66 @@ vnt_utils_show_menu()
 vnt_node_list()
 {
   kvm_list
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_nodes_start()
+{
+  local kvm=""
+
+  message "Starting [$NUMBER_OF_VMS] VNT vms..."
+  
+  for ((i = $VM_NAME_INDEX_BASE; i <= $NUMBER_OF_VMS; i++)) do
+
+    kvm="$VM_BASE_NAME$i"
+
+    # Start KVM (without a console)
+    kvm_start_headless $kvm
+
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_nodes_shutdown()
+{
+  local kvm=""
+
+  message "Shutting down [$NUMBER_OF_VMS] VNT vms..."
+  
+  for ((i = $VM_NAME_INDEX_BASE; i <= $NUMBER_OF_VMS; i++)) do
+
+    kvm="$VM_BASE_NAME$i"
+
+    # Stop KVM
+    kvm_shutdown $kvm
+
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_nodes_show_ip_address()
+{
+  local kvm=""
+  local ipaddr=""
+
+  message "Discovering kvms management interface ip address..."
+  
+  for ((i = $VM_NAME_INDEX_BASE; i <= $NUMBER_OF_VMS; i++)) do
+
+    kvm="$VM_BASE_NAME$i"
+
+    # Get KVM IP address (of management interface)
+    kvm_get_ip_address $kvm $KVM_NETWORK_MGMT ipaddr
+
+    message "kvm: [$kvm] ip address: [$ipaddr]" "$TEXT_VIEW_NORMAL_GREEN"
+
+  done
 }
 
 #==================================================================================================================
