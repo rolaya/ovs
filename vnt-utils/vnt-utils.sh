@@ -393,14 +393,23 @@ vnt_node_set_max_rate()
   local kvm=$1
   local max_rate=$2
   local pnumber=-1
+  local current_max_rate=-1
 
   message "kvm: [$kvm] set ingress policing rate: [$max_rate]..." "$TEXT_VIEW_NORMAL_RED"
 
   # Get port name from vm name
   vm_name_to_port_name $kvm pnumber
 
-  # Create ingress policing rate
-  ovs_port_qos_ingress_create $pnumber $max_rate
+  # Get current max rate
+  vnt_node_get_max_rate $kvm current_max_rate
+
+  if [[ $current_max_rate != -1 ]]; then
+    # Update max-rate qos for kvm
+    ovs_port_qos_ingress_update $pnumber $max_rate
+  else
+    # Create ingress policing rate
+    ovs_port_qos_ingress_create $pnumber $max_rate
+  fi
 }
 
 #==================================================================================================================

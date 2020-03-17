@@ -779,6 +779,24 @@ ovs_port_qos_ingress_create()
 }
 
 #==================================================================================================================
+#
+#==================================================================================================================
+ovs_port_qos_ingress_update()
+{
+  local port_number=$1
+  local port_max_rate=$2
+
+  # Update QoS max rate.
+  message "port: [$port_number] update max-rate: [$port_max_rate]..." "$TEXT_VIEW_NORMAL_GREEN"
+
+  # Delete ingress policing rate from interface
+  ovs_port_qos_ingress_policing_rate_delete $port_number
+
+  # Create ingress policing rate
+  ovs_port_qos_ingress_create $pnumber $max_rate  
+}
+
+#==================================================================================================================
 # Handles packet loss and latency
 #==================================================================================================================
 ovs_port_qos_netem_create()
