@@ -1,11 +1,8 @@
 #!/bin/sh
 
-# Generic/common UI utils
-source "ui-utils.sh"
-
 ###################################################################################################################
 # Common global utils file.
-g_common_config_file="common-utils.sh"
+g_common_utils_config_file="common-utils.sh"
 ###################################################################################################################
 
 # VNT configuration file.
@@ -782,8 +779,11 @@ kvm_img_pool_delete()
 #=================================================================================================================
 function kvm_read_configuration()
 {
+  # Generic/common UI utils
+  source "ui-utils.sh"
+
   # Source common helpers
-  source "$g_common_config_file"
+  source "$g_common_utils_config_file"
 
   # Source VNT configuration
   source "$g_vnt_config_file"
@@ -795,11 +795,18 @@ function kvm_read_configuration()
   source "$g_kvm_guest_config_file"
 }
 
-# Capture time when file was sourced 
-g_sourced_datetime="$(date +%c)"
+# Executing form bash console?
+if [[ "$CONSOLE_MODE" == "true" ]]; then
+  
+  # Capture time when file was sourced 
+  g_sourced_datetime="$(date +%c)"
 
-# Provision environment based on configuration file
-kvm_read_configuration
+  # Provision environment based on configuration file
+  kvm_read_configuration
 
-# Display helper "menu"
-kvm_utils_show_menu
+  if [[ "$DISPLAY_API_MENUS" == "true" ]]; then
+
+    # Display helper "menu"
+    kvm_utils_show_menu
+  fi
+fi

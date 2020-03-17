@@ -1,19 +1,21 @@
 #!/bin/sh
 
-# Generic/common UI utils
-source "ui-utils.sh"
-
 # VNT configuration file.
 g_vnt_config_file="config.env.vnt"
 
 ###################################################################################################################
-# The global OVS configuration file.
-g_ovs_config_file="ovs-utils.sh"
+# The global OVS configuration/management file.
+g_ovs_utils_config_file="ovs-utils.sh"
 ###################################################################################################################
 
 ###################################################################################################################
-# The global KVM configuration file.
-g_kvm_config_file="kvm-utils.sh"
+# The global KVM configuration/management  file.
+g_kvm_utils_config_file="kvm-utils.sh"
+###################################################################################################################
+
+###################################################################################################################
+# The global VNT configuration/management  file.
+g_vnt_utils_config_file="vnt-utils.sh"
 ###################################################################################################################
 
 q_queues_queue_list=""
@@ -388,10 +390,17 @@ array_list_items_find()
 #=================================================================================================================
 function common_read_configuration()
 {
+  # Generic/common UI utils
+  source "ui-utils.sh"
+
   # Source VNT configuration
   source "$g_vnt_config_file"
 }
 
-# Provision environment based on configuration file
-common_read_configuration
+# Executing form bash console?
+if [[ "$CONSOLE_MODE" == "true" ]]; then
+  
+  # Provision environment based on configuration file
+  common_read_configuration
+fi
 

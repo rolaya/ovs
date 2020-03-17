@@ -1,21 +1,18 @@
 #!/bin/sh
 
-# Generic/common UI utils
-source "ui-utils.sh"
-
 ###################################################################################################################
 # Common global utils file.
-g_common_config_file="common-utils.sh"
+g_common_utils_config_file="common-utils.sh"
 ###################################################################################################################
 
 ###################################################################################################################
 # The global OVS configuration file.
-g_ovs_config_file="ovs-utils.sh"
+g_ovs_utils_config_file="ovs-utils.sh"
 ###################################################################################################################
 
 ###################################################################################################################
 # The global KVM configuration file.
-g_kvm_config_file="kvm-utils.sh"
+g_kvm_utils_config_file="kvm-utils.sh"
 ###################################################################################################################
 
 #==================================================================================================================
@@ -634,21 +631,31 @@ ovs_table_clear_values()
 #=================================================================================================================
 function vnt_read_configuration()
 {
+  # Generic/common UI utils
+  source "ui-utils.sh"
+  
   # Source common helpers
-  source "$g_common_config_file"
+  source "$g_common_utils_config_file"
 
   # Source OVS helpers
-  source "$g_ovs_config_file"
+  source "$g_ovs_utils_config_file"
 
   # Source KVM helpers
-  source "$g_kvm_config_file"
+  source "$g_kvm_utils_config_file"
 }
 
-# Capture time when file was sourced 
-g_sourced_datetime="$(date +%c)"
+# Executing form bash console?
+if [[ "$CONSOLE_MODE" == "true" ]]; then
 
-# Provision environment based on configuration file
-vnt_read_configuration
+  # Capture time when file was sourced 
+  g_sourced_datetime="$(date +%c)"
 
-# Display helper "menu"
-vnt_utils_show_menu
+  # Provision environment based on configuration file
+  vnt_read_configuration
+
+  if [[ "$DISPLAY_API_MENUS" == "true" ]]; then
+
+    # Display helper "menu"
+    vnt_utils_show_menu
+  fi
+fi

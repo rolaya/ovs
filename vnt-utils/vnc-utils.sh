@@ -98,11 +98,19 @@ function vnc_read_configuration()
   source "$g_vnc_config_file"
 }
 
-# Capture time when file was sourced 
-g_sourced_datetime="$(date +%c)"
+# Executing form bash console?
+if [[ "$CONSOLE_MODE" == "true" ]]; then
 
-# Provision environment based on configuration file
-vnc_read_configuration
+  # Capture time when file was sourced 
+  g_sourced_datetime="$(date +%c)"
 
-# Display helper "menu"
-vnc_utils_show_menu
+  # Provision environment based on configuration file
+  vnc_read_configuration
+
+  if [[ "$DISPLAY_API_MENUS" == "true" ]]; then
+
+    # Display helper "menu"
+    vnc_utils_show_menu
+  fi
+fi
+

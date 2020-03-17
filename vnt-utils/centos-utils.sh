@@ -1,8 +1,5 @@
 #!/bin/sh
 
-# Source host and environment specific VNT configuration
-source "ui-utils.sh"
-
 # The global configuration file for CentOS VNT VM
 g_centos_config_file="config.env.kvm_vnt_host"
 
@@ -153,14 +150,24 @@ centos_provision()
 function centos_read_configuration()
 {
   # Source host and environment specific VNT configuration
+  source "ui-utils.sh"
+
+  # Source host and environment specific VNT configuration
   source "$g_centos_config_file"
 }
 
-# Capture time when file was sourced 
-g_sourced_datetime="$(date +%c)"
+# Executing form bash console?
+if [[ "$CONSOLE_MODE" == "true" ]]; then
 
-# Provision environment based on configuration file
-centos_read_configuration
+  # Capture time when file was sourced 
+  g_sourced_datetime="$(date +%c)"
 
-# Display helper "menu"
-centos_utils_show_menu
+  # Provision environment based on configuration file
+  centos_read_configuration
+
+  if [[ "$DISPLAY_API_MENUS" == "true" ]]; then
+
+    # Display helper "menu"
+    centos_utils_show_menu
+  fi
+fi

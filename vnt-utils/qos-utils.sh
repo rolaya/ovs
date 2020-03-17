@@ -2,12 +2,9 @@
 
 #set -x			# activate debugging from here
 
-# Source host and environment specific VNT configuration
-source "ui-utils.sh"
-
 ###################################################################################################################
 # Common global utils file.
-g_common_config_file="common-utils.sh"
+g_common_utils_config_file="common-utils.sh"
 ###################################################################################################################
 
 # The network interface configuration file. Modify as per host.
@@ -252,12 +249,19 @@ vnt_node_get_qos_ingress_policing_rate()
 #=================================================================================================================
 function qos_read_configuration()
 {
+  # Source host and environment specific VNT configuration
+  source "ui-utils.sh"
+  
   # Source common helpers
-  source "$g_common_config_file"
+  source "$g_common_utils_config_file"
 }
 
-# Capture time when file was sourced 
-g_sourced_datetime="$(date +%c)"
+# Executing form bash console?
+if [[ "$CONSOLE_MODE" == "true" ]]; then
 
-# Provision environment based on configuration file
-qos_read_configuration
+  # Capture time when file was sourced 
+  g_sourced_datetime="$(date +%c)"
+
+  # Provision environment based on configuration file
+  qos_read_configuration
+fi
