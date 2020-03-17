@@ -372,17 +372,25 @@ vnt_node_htb_del_max_rate()
 vnt_node_get_max_rate()
 {
   local kvm=$1
-  local xrate=-1
+  local maxrate=-1
   
-  message "Get ingress policing rate for kvm: [$kvm]..." "$TEXT_VIEW_NORMAL_RED"
-
   # Get qos information for the node
   vnt_node_get_qos_info $kvm
 
   # Get ingress policing rate (if any) 
-  array_list_items_find "ingress_policing_rate" xrate "${g_qos_ingress_policing_config_array[@]}" 
+  array_list_items_find "ingress_policing_rate" maxrate "${g_qos_ingress_policing_config_array[@]}"
 
-  eval "$2='$xrate'"
+  if [[ $maxrate > 0 ]]; then
+    # Convert to mbps bps
+    maxrate=$((maxrate*1000))
+  else
+    # To keep interface consistent across qos get, return -1 to indicate max-rate is not set
+    maxrate=-1
+  fi
+
+  message "kvm: [$kvm] max-rate: [$maxrate]..." "$TEXT_VIEW_NORMAL_RED"
+
+  eval "$2='$maxrate'"
 }
 
 #==================================================================================================================
