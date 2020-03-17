@@ -1778,6 +1778,41 @@ ovs_qos_table_clear_queues()
 #==================================================================================================================
 # 
 #==================================================================================================================
+ovs_interface_table_reset_ingress_policing()
+{
+  local index=0
+  local table="interface"
+  local column="ingress_policing_rate"
+  local ingress_policing_rate=""
+  local value="0"
+
+  # Get all uuids from given table
+  ovs_table_get_records_uuid $table
+
+  # Get number of records to purge from table
+  arraylength=${#uuid_array[@]}
+
+  message "Resetting [$arraylength] $field records from table: [$table]"
+
+  # Purge all records
+  for uuid in "${uuid_array[@]}"; do
+
+    uuid=$(echo ${uuid:(-36)})
+
+    ovs_table_get_value $table $uuid $column ingress_policing_rate
+
+    echo "uuid[$index]: [$uuid] ingress_policing_rate: [$ingress_policing_rate]"
+
+    # reset current record's ingress_policing_rate field
+    ovs_table_set_value $table $uuid $column $value
+
+    ((index++))
+  done
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
 ovs_port_table_clear_qos()
 {
   local index=0

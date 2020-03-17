@@ -70,9 +70,9 @@ vnt_utils_show_menu()
   show_menu_option "vnt_node_set_packet_loss  " " - VNT node set packet loss"
   show_menu_option "vnt_node_del_packet_loss  " " - VNT node delete packet loss"
 
-  show_menu_option "vnt_node_get_ingress_policing_rate " " - VNT node get ingress policing rate"
-  show_menu_option "vnt_node_set_ingress_policing_rate " " - VNT node set ingress policing rate"
-  show_menu_option "vnt_node_del_ingress_policing_rate " " - VNT node delete ingress policing rate"
+  #show_menu_option "vnt_node_htb_get_max_rate " " - VNT node get max rate"
+  #show_menu_option "vnt_node_htb_set_max_rate " " - VNT node set max rate"
+  #show_menu_option "vnt_node_htb_del_max_rate " " - VNT node delete max rate"
 
   echo
 
@@ -252,7 +252,11 @@ vnt_node_del_latency()
   vm_name_to_port_name $kvm pname
   vm_name_to_port_number $kvm pnumber
 
-  message "Deleting latency from kvm: [$kvm] port: [$pname/$pnumber] keep other config: [$keep_other_config]..." "$TEXT_VIEW_NORMAL_RED"
+  if [[ $keep_other_config != "true" ]] && [[ $keep_other_config != "false" ]]; then
+    keep_other_config="true"
+  fi
+
+  message "Deleting latency from kvm: [$kvm] port: [$pname] keep other config: [$keep_other_config]..." "$TEXT_VIEW_NORMAL_RED"
 
   # Get port latency (if any)
   vnt_node_get_latency $kvm current_latency
@@ -281,7 +285,7 @@ vnt_node_del_latency()
 #==================================================================================================================
 # 
 #==================================================================================================================
-vnt_node_get_max_rate()
+vnt_node_htb_get_max_rate()
 {
   local kvm=$1
   local max_rate=-1
@@ -292,7 +296,7 @@ vnt_node_get_max_rate()
   vnt_node_get_qos_info $kvm
 
   # Get max-rate (if any) 
-  array_list_items_find "max-rate" max_rate
+  array_list_items_find "max-rate" max_rate "${g_qos_info_other_config_array[@]}" 
 
   eval "$2='$max_rate'"
 }
@@ -300,7 +304,7 @@ vnt_node_get_max_rate()
 #==================================================================================================================
 # 
 #==================================================================================================================
-vnt_node_set_max_rate()
+vnt_node_htb_set_max_rate()
 {
   local kvm=$1
   local max_rate=$2
@@ -335,7 +339,7 @@ vnt_node_set_max_rate()
 #==================================================================================================================
 # 
 #==================================================================================================================
-vnt_node_del_max_rate()
+vnt_node_htb_del_max_rate()
 {
   local kvm_name=$1
   local pname=""
@@ -365,7 +369,7 @@ vnt_node_del_max_rate()
 #==================================================================================================================
 # 
 #==================================================================================================================
-vnt_node_get_ingress_policing_rate()
+vnt_node_get_max_rate()
 {
   local kvm=$1
   local xrate=-1
@@ -376,7 +380,7 @@ vnt_node_get_ingress_policing_rate()
   vnt_node_get_qos_info $kvm
 
   # Get ingress policing rate (if any) 
-  array_list_items_find "ingress_policing_rate" xrate
+  array_list_items_find "ingress_policing_rate" xrate "${g_qos_ingress_policing_config_array[@]}" 
 
   eval "$2='$xrate'"
 }
@@ -384,7 +388,7 @@ vnt_node_get_ingress_policing_rate()
 #==================================================================================================================
 # 
 #==================================================================================================================
-vnt_node_set_ingress_policing_rate()
+vnt_node_set_max_rate()
 {
   local kvm=$1
   local max_rate=$2
@@ -402,7 +406,7 @@ vnt_node_set_ingress_policing_rate()
 #==================================================================================================================
 # 
 #==================================================================================================================
-vnt_node_del_ingress_policing_rate()
+vnt_node_del_max_rate()
 {
   local kvm=$1
   local pname=""
@@ -415,7 +419,7 @@ vnt_node_del_ingress_policing_rate()
   message "kvm: [$kvm/$pname] delete ingress policing rate..." "$TEXT_VIEW_NORMAL_RED"
 
   # Get port packet loss (if any)
-  vnt_node_get_ingress_policing_rate $kvm rate
+  vnt_node_get_max_rate $kvm rate
 
   # Ingress policing rate configured?
   if [[ $rate != -1 ]]; then
@@ -477,7 +481,11 @@ vnt_node_del_packet_loss()
   vm_name_to_port_name $kvm pname
   vm_name_to_port_number $kvm pnumber
 
-  message "deleting packet loss from kvm: [$kvm] port: [$pname/$pnumber] keep other config: [$keep_other_config]..." "$TEXT_VIEW_NORMAL_RED"
+  if [[ $keep_other_config != "true" ]] && [[ $keep_other_config != "false" ]]; then
+    keep_other_config="true"
+  fi
+  
+  message "deleting packet loss from kvm: [$kvm] port: [$pname] keep other config: [$keep_other_config]..." "$TEXT_VIEW_NORMAL_RED"
 
   # Get port latency (if any)
   vnt_node_get_latency $kvm current_latency
@@ -510,7 +518,6 @@ vnt_node_get_latency()
 {
   local kvm=$1
   local latency=-1
-  local other_config_info=""
 
   message "Get latency for kvm: [$kvm]..." "$TEXT_VIEW_NORMAL_RED"
 
@@ -518,7 +525,7 @@ vnt_node_get_latency()
   vnt_node_get_qos_info $kvm
 
   # Get latency (if any) 
-  array_list_items_find "latency" latency
+  array_list_items_find "latency" latency "${g_qos_info_other_config_array[@]}" 
 
   # return info to caller
   eval "$2='$latency'"
@@ -538,32 +545,9 @@ vnt_node_get_packet_loss()
   vnt_node_get_qos_info $kvm
 
   # Get packet loss (if any) 
-  array_list_items_find "loss" packet_loss
+  array_list_items_find "loss" packet_loss "${g_qos_info_other_config_array[@]}" 
 
   eval "$2='$packet_loss'"
-}
-
-#==================================================================================================================
-# 
-#==================================================================================================================
-vnt_node_get_qos_netem()
-{
-  local kvm=$1
-  
-  g_qos_info_other_config_array=""
-
-  # Get qos information for the node
-  vnt_node_get_qos_info $kvm
-
-  # Qos linux-netem?
-  if [[ "$g_qos_info_type" = "linux-netem" ]]; then  
-
-    # "other_config" configuration items are separated by IFS
-    IFS=',' read -ra  g_qos_info_other_config_array <<< "$g_qos_info_other_config"
-
-    # List netem configuration
-    other_config_array_list_items
-  fi
 }
 
 #==================================================================================================================
@@ -577,13 +561,14 @@ vnt_switch_del_qos()
   # Reset "queues" from every "qos" in the system
   ovs_qos_table_clear_queues
 
+  # Reset "interface" table qos ("ingress_policing_rate")
+  ovs_interface_table_reset_ingress_policing
+
   # Purge all records from "queue" table
   ovs_table_purge_records "queue"
 
   # Purge all records from "qos" table
   ovs_table_purge_records "qos"
-
-  #rolaya
 }
 
 #==================================================================================================================

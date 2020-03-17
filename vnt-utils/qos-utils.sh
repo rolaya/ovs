@@ -5,6 +5,11 @@
 # Source host and environment specific VNT configuration
 source "ui-utils.sh"
 
+###################################################################################################################
+# Common global utils file.
+g_common_config_file="common-utils.sh"
+###################################################################################################################
+
 # The network interface configuration file. Modify as per host.
 g_net_iface_config_file="config.env.net-iface"
 
@@ -23,6 +28,9 @@ g_qos_info_type=""
 
 # Array of "other_config"
 unset g_qos_info_other_config_array
+
+# Array of "ingress_policing*"
+unset g_qos_ingress_policing_config_array
 
 #==================================================================================================================
 #
@@ -46,7 +54,10 @@ port_log_qos_info()
   echo "queues:       [${g_qos_info_queues}]"
   echo "type:         [${g_qos_info_type}]"
 
-  other_config_array_list_items
+  qos_config_array_list_items "${g_qos_info_other_config_array[@]}"
+
+  qos_config_array_list_items "${g_qos_ingress_policing_config_array[@]}"
+
   echo "-------------------------------------------------------------"
 }
 
@@ -63,12 +74,14 @@ vnt_node_get_qos_info()
   vnt_node_get_qos_netem $kvm_name
 
   # Get linux-htb configuration (max-rate)
-  vnt_node_get_qos_htb $kvm_name
+  #vnt_node_get_qos_htb $kvm_name
 
   # Get ingress policing rate configuration
   vnt_node_get_qos_ingress_policing_rate $kvm_name
 
-  other_config_array_list_items
+  qos_config_array_list_items "${g_qos_info_other_config_array[@]}"
+
+  qos_config_array_list_items "${g_qos_ingress_policing_config_array[@]}"
 }
 
 #==================================================================================================================
@@ -149,7 +162,7 @@ vnt_node_get_qos_netem()
       g_qos_info_type=$qos_type
 
       # other_config configuration items are separated by IFS
-      IFS=',' read -ra  g_qos_info_other_config_array <<< "$g_qos_info_other_config"      
+      IFS=',' read -ra  g_qos_info_other_config_array <<< "$g_qos_info_other_config"  
     fi
   fi
 
@@ -214,7 +227,7 @@ vnt_node_get_qos_ingress_policing_rate()
   g_qos_info_kvm_name="$kvm_name"
   g_qos_info_port_name="$pname"
   g_qos_info_port_number="$pnumber"
-  unset g_qos_info_other_config_array
+  unset g_qos_ingress_policing_config_array
 
   # Find record in "interface" table
   table="interface"
@@ -228,9 +241,23 @@ vnt_node_get_qos_ingress_policing_rate()
     ovs_table_get_value $table $uuid "ingress_policing_rate" ingress_policing_rate
 
     # Update qos array (all possible qos for the port/vm)
-    g_qos_info_other_config_array+=( "ingress_policing_rate:$ingress_policing_rate" )    
+    g_qos_ingress_policing_config_array+=( "ingress_policing_rate:$ingress_policing_rate" )    
   fi
 
   port_log_qos_info $pname
 }
 
+#==================================================================================================================
+#
+#=================================================================================================================
+function qos_read_configuration()
+{
+  # Source common helpers
+  source "$g_common_config_file"
+}
+
+# Capture time when file was sourced 
+g_sourced_datetime="$(date +%c)"
+
+# Provision environment based on configuration file
+qos_read_configuration

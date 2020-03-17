@@ -312,18 +312,19 @@ ovs_table_qos_item_queues_update()
 #==================================================================================================================
 #
 #==================================================================================================================
-other_config_array_list_items()
+qos_config_array_list_items()
 {
+  local qos_info_array=("$@")
   local arraylength=0
   local item=""
   local index=0
 
-  arraylength=${#g_qos_info_other_config_array[@]}
+  arraylength=${#qos_info_array[@]}
 
-  message "array contains [$arraylength] items, processing..."
+  message "array contains [$arraylength] item(s), processing..."
 
-  # Find qos queue based on port number
-  for item in "${g_qos_info_other_config_array[@]}"; do
+  # List all array items
+  for item in "${qos_info_array[@]}"; do
 
     echo "item[$index]: [$item]"
 
@@ -338,6 +339,10 @@ other_config_array_list_items()
 array_list_items_find()
 {
   local item_name=$1
+  shift
+  local item_ref=$1
+  shift
+  local qos_info_array=("$@")
   local arraylength=0
   local item=""
   local index=0
@@ -346,14 +351,13 @@ array_list_items_find()
   local temp_value=""
 
   # Get number of configuration elements in array
-  arraylength=${#g_qos_info_other_config_array[@]}
+  arraylength=${#qos_info_array[@]}
 
   message "Looking for [$item_name] value in array with [$arraylength] items, processing..."
 
   # Find configuration item, something like "latency="200000""
-  for item in "${g_qos_info_other_config_array[@]}"; do
+  for item in "${qos_info_array[@]}"; do
 
-    echo "item: $item"
     echo "item[$index]: [$item]"
 
     # Given something like "latency="500000"", extract value (i.e. "500000")
@@ -362,10 +366,10 @@ array_list_items_find()
     # other_config configured?
     if [[ "$temp_value" != "" ]]; then
       
-      # We are interested in the raw value (given someething ""500000"", extract "500000")
+      # We are interested in the raw value (given something ""500000"", extract "500000")
       item_value=$(echo "$temp_value" | sed 's/[^0-9]*//g')
 
-      echo "$item_name: [$item_value]"
+      echo "found: $item_name: [$item_value]"
 
       break
     fi
@@ -376,7 +380,7 @@ array_list_items_find()
 
   message "Item:  [$item_name] value: [$item_value]..."
 
-  eval "$2='$item_value'"
+  eval "$item_ref='$item_value'"
 }
 
 #==================================================================================================================
