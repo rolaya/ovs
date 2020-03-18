@@ -19,7 +19,7 @@ g_kvm_utils_config_file="kvm-utils.sh"
 CONSOLE_MODE=true
 
 # This setting determines whether a "menuing" system is displayed at the console
-DISPLAY_API_MENUS=false
+DISPLAY_API_MENUS=true
 
 #==================================================================================================================
 #

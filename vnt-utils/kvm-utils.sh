@@ -401,13 +401,12 @@ kvm_import_headless()
 #==================================================================================================================
 qt()
 {
-  local kvm_name=$1
   local command=""
-  local kvm_number=-1
-  local kvm_guest_config="$g_kvm_guest_config_file"
-  local pattern=""
 
-  "virsh net-dhcp-leases default"
+  #x="name"
+  #net_name=""
+  #net_name=$(sed -n "/$x/{s/.*<$x>\(.*\)<\/$x>.*/\1/;p}" kvm-mgmt-network.xml)
+  #echo "sdasdnkasdas $net_name"  
 }
 
 #==================================================================================================================
@@ -453,6 +452,8 @@ kvm_reprovision_net_interfaces()
 
   if [[ "$kvm_name" != "" ]]; then  
 
+    message "upgrading kvm: [$kvm_name] network interfaces" $TEXT_VIEW_NORMAL_RED
+
     # Undefine given KVM
     command="sudo virsh undefine $kvm_name"
     echo "Executing: [$command]"
@@ -485,7 +486,7 @@ kvm_attach_interface()
 
   if [[ "$kvm_name" != "" ]]; then  
 
-    message "adding management interface to kvm: [$kvm_name]" $TEXT_VIEW_NORMAL_GREEN
+    message "adding qos management interface to kvm: [$kvm_name]" $TEXT_VIEW_NORMAL_GREEN
 
     # Attach the management interface to the KVM, this will allow us to ssh, etc into the KVM
     command="sudo virsh attach-interface 
@@ -692,24 +693,32 @@ kvm_get_ip_address()
 #==================================================================================================================
 #
 #==================================================================================================================
-kvm_ovs_network_provision()
+kvm_vnt_network_provision()
 {
+  xmli="name"
   local command=""
+  local net_file=${1:-$kvm_ovs_network_definition_file}
+  local net_name=""
+
+  # Get the "<name>" (network name)
+  net_name=$(grep -oP "(?<=<$xmli>).*(?=</$xmli)" $net_file)
+
+  message "Defining network: [$net_name] from configuration file: [$net_file]" $TEXT_VIEW_NORMAL_GREEN
 
   # Add new persistent virtual network to libvirt
-  command="sudo virsh net-define $kvm_ovs_network_definition_file"
+  command="sudo virsh net-define $net_file"
   echo "Executing: [$command]"
   $command  
 
-  command="sudo virsh net-start $kvm_ovs_network_name"
+  command="sudo virsh net-start $net_name"
   echo "Executing: [$command]"
   $command  
   
-  command="sudo virsh net-autostart $kvm_ovs_network_name"
+  command="sudo virsh net-autostart $net_name"
   echo "Executing: [$command]"
   $command  
 
-  command="sudo virsh net-dumpxml $kvm_ovs_network_name"
+  command="sudo virsh net-dumpxml $net_name"
   echo "Executing: [$command]"
   $command  
 
@@ -777,6 +786,18 @@ kvm_img_pool_delete()
 #==================================================================================================================
 #
 #=================================================================================================================
+function kvm_gen_mac_addr()
+{
+  local MACADDR=""
+   
+  MACADDR="52:54:00:$(dd if=/dev/urandom bs=512 count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\).*$/\1:\2:\3/')"; 
+  
+  echo $MACADDR
+}
+
+#==================================================================================================================
+#
+#=================================================================================================================
 function kvm_read_configuration()
 {
   # Generic/common UI utils
@@ -795,7 +816,7 @@ function kvm_read_configuration()
   source "$g_kvm_guest_config_file"
 }
 
-# Executing form bash console?
+# Executing from bash console?
 if [[ "$CONSOLE_MODE" == "true" ]]; then
   
   # Capture time when file was sourced 

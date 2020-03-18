@@ -1,0 +1,11 @@
+<network>
+  <name>kvm-mgmt-network</name>
+  <forward mode='nat'/>
+  <bridge name='vnt-mgmt-br0' stp='on' delay='0'/>
+  <mac address='52:54:00:ea:48:c2'/>
+  <ip address='192.168.10.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='192.168.10.2' end='192.168.10.254'/>
+    </dhcp>
+  </ip>
+</network>
