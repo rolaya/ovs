@@ -816,6 +816,12 @@ function kvm_read_configuration()
   source "$g_kvm_guest_config_file"
 }
 
+# CONSOLE_MODE environment variable not set?
+if [[ -z "$CONSOLE_MODE" ]]; then
+  CONSOLE_MODE=true
+  DISPLAY_API_MENUS=true
+fi
+
 # Executing from bash console?
 if [[ "$CONSOLE_MODE" == "true" ]]; then
   
