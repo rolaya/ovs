@@ -114,7 +114,7 @@ kvm_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM/OVS network provision"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "kvm_ovs_network_provision " " - Provision KVM/OVS network"
+  show_menu_option "kvm_vnt_network_provision " " - Provision VNT KVM network"
 
   # KVM guest image pool
   echo
