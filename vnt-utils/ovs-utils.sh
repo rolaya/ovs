@@ -2,6 +2,23 @@
 
 #set -x			# activate debugging from here
 
+# CONSOLE_MODE environment variable not set?
+if [[ -z "$CONSOLE_MODE" ]]; then
+  CONSOLE_MODE=true
+  DISPLAY_API_MENUS=true
+fi
+
+# CONSOLE_MODE environment variable not set?
+if [[ "$CONSOLE_MODE" == "true" ]]; then
+
+  # Source host and environment specific VNT configuration
+  source "ui-utils.sh"
+
+  # Echo name of file being sourced
+  this_script_name=`basename -- $BASH_SOURCE`
+  source_file_message "Sourcing file:" "$this_script_name"
+fi
+
 # The network interface configuration file. Modify as per host.
 g_net_iface_config_file="config.env.net-iface"
 
@@ -78,6 +95,7 @@ ovs_show_menu()
   echo "Network interface:                [$HOST_NETIFACE_NAME]"
   echo "Network interface IP address:     [$HOST_NETIFACE_IP]"
   echo "Default gateway IP address:       [$GATEWAY_IP]"
+  echo "Default max-rate:                 [$qos_default_max_rate]"
   echo "OVS bridge name:                  [$OVS_BRIDGE]"
   echo "Tap port interface name:          [$OVS_PORT_NAME_BASE]"
   echo "Tap port interface index:         [$OVS_PORT_INDEX_BASE]"
@@ -2429,16 +2447,13 @@ centos_provision_ovs_build()
 #==================================================================================================================
 #
 #=================================================================================================================
-function provision_environment()
+function ovs_read_configuration()
 {
-  echo "Sourcing configuration file: [$g_net_iface_config_file]"
-  echo "Sourcing configuration file: [$g_vnt_config_file]"
+  # All global script files are defined here
+  source "vnt-scripts.sh"
 
   # Source host and environment specific VNT configuration
-  source "ui-utils.sh"
-
-  # Source host and environment specific VNT configuration
-  source "qos-utils.sh"
+  source "$g_qos_utils_script_file"
   source "$g_net_iface_config_file"
   source "$g_vnt_config_file"
 }
@@ -2447,7 +2462,7 @@ function provision_environment()
 if [[ "$CONSOLE_MODE" == "true" ]]; then
 
   # Provision environment based on configuration file
-  provision_environment
+  ovs_read_configuration
 
   if [[ "$DISPLAY_API_MENUS" == "true" ]]; then
 

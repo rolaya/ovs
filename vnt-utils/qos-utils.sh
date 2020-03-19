@@ -2,10 +2,22 @@
 
 #set -x			# activate debugging from here
 
-###################################################################################################################
-# Common global utils file.
-g_common_utils_config_file="common-utils.sh"
-###################################################################################################################
+# CONSOLE_MODE environment variable not set?
+if [[ -z "$CONSOLE_MODE" ]]; then
+  CONSOLE_MODE=true
+  DISPLAY_API_MENUS=true
+fi
+
+# CONSOLE_MODE environment variable not set?
+if [[ "$CONSOLE_MODE" == true ]]; then
+
+  # Source host and environment specific VNT configuration
+  source "ui-utils.sh"
+
+  # Echo name of file being sourced
+  this_script_name=`basename -- $BASH_SOURCE`
+  source_file_message "Sourcing file:" "$this_script_name"
+fi
 
 # The network interface configuration file. Modify as per host.
 g_net_iface_config_file="config.env.net-iface"
@@ -249,11 +261,11 @@ vnt_node_get_qos_ingress_policing_rate()
 #=================================================================================================================
 function qos_read_configuration()
 {
-  # Source host and environment specific VNT configuration
-  source "ui-utils.sh"
-  
+  # All global script files are defined here
+  source "vnt-scripts.sh"
+
   # Source common helpers
-  source "$g_common_utils_config_file"
+  source "$g_common_utils_script_file"
 }
 
 # Executing form bash console?

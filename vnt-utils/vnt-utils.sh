@@ -1,19 +1,21 @@
 #!/bin/sh
 
-###################################################################################################################
-# Common global utils file.
-g_common_utils_config_file="common-utils.sh"
-###################################################################################################################
+# CONSOLE_MODE environment variable not set?
+if [[ -z "$CONSOLE_MODE" ]]; then
+  CONSOLE_MODE=true
+  DISPLAY_API_MENUS=true
+fi
 
-###################################################################################################################
-# The global OVS configuration file.
-g_ovs_utils_config_file="ovs-utils.sh"
-###################################################################################################################
+# CONSOLE_MODE environment variable not set?
+if [[ "$CONSOLE_MODE" == true ]]; then
 
-###################################################################################################################
-# The global KVM configuration file.
-g_kvm_utils_config_file="kvm-utils.sh"
-###################################################################################################################
+  # Source host and environment specific VNT configuration
+  source "ui-utils.sh"
+
+  # Echo name of file being sourced
+  this_script_name=`basename -- $BASH_SOURCE`
+  source_file_message "Sourcing file:" "$this_script_name"
+fi
 
 #==================================================================================================================
 #
@@ -631,17 +633,17 @@ ovs_table_clear_values()
 #=================================================================================================================
 function vnt_read_configuration()
 {
-  # Generic/common UI utils
-  source "ui-utils.sh"
-  
+  # All global script files are defined here
+  source "vnt-scripts.sh"
+
   # Source common helpers
-  source "$g_common_utils_config_file"
+  source "$g_common_utils_script_file"
 
   # Source OVS helpers
-  source "$g_ovs_utils_config_file"
+  source "$g_ovs_utils_script_file"
 
   # Source KVM helpers
-  source "$g_kvm_utils_config_file"
+  source "$g_kvm_utils_script_file"
 }
 
 # Executing form bash console?

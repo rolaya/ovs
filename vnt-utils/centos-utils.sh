@@ -1,5 +1,22 @@
 #!/bin/sh
 
+# CONSOLE_MODE environment variable not set?
+if [[ -z "$CONSOLE_MODE" ]]; then
+  CONSOLE_MODE=true
+  DISPLAY_API_MENUS=true
+fi
+
+# CONSOLE_MODE environment variable not set?
+if [[ "$CONSOLE_MODE" == true ]]; then
+
+  # Source host and environment specific VNT configuration
+  source "ui-utils.sh"
+
+  # Echo name of file being sourced
+  this_script_name=`basename -- $BASH_SOURCE`
+  source_file_message "Sourcing file:" "$this_script_name"
+fi
+
 # The global configuration file for CentOS VNT VM
 g_centos_config_file="config.env.kvm_vnt_host"
 
@@ -149,8 +166,8 @@ centos_provision()
 #==================================================================================================================
 function centos_read_configuration()
 {
-  # Source host and environment specific VNT configuration
-  source "ui-utils.sh"
+  # All global script files are defined here
+  source "vnt-scripts.sh"
 
   # Source host and environment specific VNT configuration
   source "$g_centos_config_file"
