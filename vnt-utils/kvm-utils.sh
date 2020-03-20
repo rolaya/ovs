@@ -399,6 +399,60 @@ kvm_import_headless()
 #==================================================================================================================
 #
 #==================================================================================================================
+kvm_import_by_name()
+{
+  local command=""
+  local kvm_name=$1
+
+  # Update configuration (i.e. the name of the VM on the guest configuration file)
+  kvm_guest_configuration_update $kvm_name
+
+  # Source default VNT network node configuration file
+  source "$g_kvm_guest_config_file"
+
+  # Set configuration parameters for guest KVM.
+  local kvm_name=$KVM_GUEST_NAME
+  local kvm_type=$KVM_GUEST_TYPE
+  local kvm_variant=$KVM_GUEST_VARIANT
+  local kvm_ram=$KVM_GUEST_RAM
+  local kvm_size=$KVM_GUEST_SIZE
+  local kvm_iso=$KVM_GUEST_ISO
+  local kvm_network_ovs=$KVM_NETWORK_OVS
+  local kvm_network_mgmt=$KVM_NETWORK_MGMT
+
+  # Install/import guest
+  command="sudo virt-install --debug
+              --name $kvm_name
+              --os-type=$kvm_type
+              --os-variant=$kvm_variant
+              --ram=$kvm_ram
+              --vcpus=1
+              --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
+              --network network:$kvm_network_mgmt
+              --graphics $KVM_INSTALL_OPTION_GRAPHICS
+              --import"
+  echo "Executing: [$command]"
+
+  $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_clone()
+{
+  local command=""
+  local kvm_name=$1
+
+  # Clone guest
+  command="sudo virt-clone --debug --original kvm-vnt-node1 --auto-clone --name $kvm_name"
+  echo "Executing: [$command]"
+  $command                 
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
 qt()
 {
   local command=""
