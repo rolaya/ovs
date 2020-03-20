@@ -116,6 +116,7 @@ kvm_utils_show_menu()
   show_menu_option "kvm_list     " " - \"$HOSTNAME\" guest list"
   show_menu_option "kvm_install  " " - \"$KVM_GUEST_NAME\" guest install"
   show_menu_option "kvm_import   " " - \"$KVM_GUEST_NAME\" guest import"
+  show_menu_option "kvm_clone    " " - \"$KVM_GUEST_NAME\" guest clone"
   show_menu_option "kvm_purge    " " - \"$KVM_GUEST_NAME\" guest purge"
   show_menu_option "kvm_start    " " - \"$KVM_GUEST_NAME\" guest start"
   show_menu_option "kvm_shutdown " " - \"$KVM_GUEST_NAME\" guest shutdown"
@@ -404,6 +405,21 @@ kvm_import_headless()
               --nographics
               --noautoconsole
               --import"
+  echo "Executing: [$command]"
+  $command
+}
+
+#==================================================================================================================
+#
+#==================================================================================================================
+kvm_clone()
+{
+  local kvm_src=$1
+  local kvm_dst=$2
+  local command=""
+
+  # Install/import (headless)
+  command="sudo virt-clone --debug --original $kvm_src --name $kvm_dst --auto-clone"
   echo "Executing: [$command]"
   $command
 }
