@@ -68,7 +68,7 @@ vnt_lauch_iperf_servers()
     ipert_server_port=$((base_port+i))
     message "starting iperf3 on port: [$ipert_server_port]..." "$TEXT_VIEW_NORMAL_GREEN"
 
-    command="iperf3 -s -V -p $ipert_server_port"
+    command="iperf3 -s -D -V -p $ipert_server_port"
     echo "executing: [$command]..."
     $command
   
