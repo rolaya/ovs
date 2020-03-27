@@ -2336,15 +2336,16 @@ ovs_setup_qos_params()
 }
 
 #==================================================================================================================
+#
 #==================================================================================================================
-ovs_enable_multicast_snooping()
+ovs_bridge_multicast_snooping_enable()
 {
   local command=""
   local kname=""
   local pname=""
 
-  # Configure bridge br0 to enable multicast snooping
-  message "Configurig bridge $OVS_BRIDGE to enable multicast snooping" "$TEXT_VIEW_NORMAL_GREEN"
+  # Enable multicast snooping on bridge
+  message "Enable multicast snooping on bridge $OVS_BRIDGE" "$TEXT_VIEW_NORMAL_GREEN"
   command="sudo ovs-vsctl set Bridge $OVS_BRIDGE mcast_snooping_enable=true"
   echo "Executing: [$command]"
   $command  
@@ -2369,34 +2370,85 @@ ovs_enable_multicast_snooping()
 
   for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
 
-    # Format kvm name something like kvm-vnt-node1
+    # Format kvm name (something like kvm-vnt-node1)
     kname="$VM_BASE_NAME$i"
 
+    # Get ovs port name based kvm name
     vm_name_to_port_name $kname pname
 
-    ovs_port_enable_multicast_snooping $pname
+    # Configure multicast snooping on port
+    ovs_port_multicast_snooping_enable $pname
 
   done
 }
 
 #==================================================================================================================
 #==================================================================================================================
-ovs_port_enable_multicast_snooping()
+ovs_port_multicast_snooping_configure()
 {
   local command=""
-  local port_name=$1 
+  local port_name=$1
+  local config=$2
 
   # Enable flooding of multicast packets (except Reports) on a specific port
-  message "Enabling flooding of multicast packets (except Reports) on port $port_name" "$TEXT_VIEW_NORMAL_GREEN"
-  command="sudo ovs-vsctl set Port $port_name other_config:mcast-snooping-flood=true"
+  message "Configuring flooding of multicast packets (except Reports) on port $port_name to $config" "$TEXT_VIEW_NORMAL_GREEN"
+  command="sudo ovs-vsctl set Port $port_name other_config:mcast-snooping-flood=$config"
   echo "Executing: [$command]"
   $command  
 
   # Enable flooding of Reports on a specific port
-  message "Enabling flooding of Reports on port $port_name" "$TEXT_VIEW_NORMAL_GREEN"
-  command="sudo ovs-vsctl set Port $port_name other_config:mcast-snooping-flood-reports=true"
+  message "Configuring flooding of Reports on port $port_name to $config" "$TEXT_VIEW_NORMAL_GREEN"
+  command="sudo ovs-vsctl set Port $port_name other_config:mcast-snooping-flood-reports=$config"
   echo "Executing: [$command]"
   $command
+}
+
+#==================================================================================================================
+#==================================================================================================================
+ovs_port_multicast_snooping_enable()
+{
+  local command=""
+  local port_name=$1 
+
+  ovs_port_multicast_snooping_configure $port_name "true"
+}
+
+#==================================================================================================================
+#==================================================================================================================
+ovs_port_multicast_snooping_disable()
+{
+  local command=""
+  local port_name=$1 
+
+  ovs_port_multicast_snooping_configure $port_name "false"
+}
+
+#==================================================================================================================
+#==================================================================================================================
+ovs_bridge_multicast_snooping_disable()
+{
+  local command=""
+  local kname=""
+  local pname=""
+
+  # Disable multicasting snooping on bridge
+  message "Disable multicast snooping on bridge $OVS_BRIDGE" "$TEXT_VIEW_NORMAL_GREEN"
+  command="sudo ovs-vsctl set Bridge $OVS_BRIDGE mcast_snooping_enable=false"
+  echo "Executing: [$command]"
+  $command  
+
+  for ((i = 1; i <= $NUMBER_OF_VMS; i++)) do
+
+    # Format kvm name something like kvm-vnt-node1
+    kname="$VM_BASE_NAME$i"
+
+    # Get ovs port name based kvm name
+    vm_name_to_port_name $kname pname
+
+    # Configure multicast snooping on port
+    ovs_port_multicast_snooping_disable $pname
+
+  done
 }
 
 #==================================================================================================================
