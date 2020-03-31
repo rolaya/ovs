@@ -98,7 +98,7 @@ centos_ovs_provision()
 
   # Build OVS RPM and install it.
   bash_execute_command "rpmbuild -bb --nocheck openvswitch-2.12.0/rhel/openvswitch-fedora.spec"
-  bash_execute_command "sudo yum install /home/rolaya/rpmbuild/RPMS/x86_64/openvswitch-2.12.0-1.el7.x86_64.rpm -y"
+  bash_execute_command "sudo yum install /home/$USER/rpmbuild/RPMS/x86_64/openvswitch-2.12.0-1.el7.x86_64.rpm -y"
 
   # Start OVS and enable to start on boot 
   bash_execute_command "sudo systemctl start openvswitch.service"
@@ -122,7 +122,7 @@ centos_provision()
   bash_execute_command "sudo systemctl start libvirtd"
   bash_execute_command "sudo systemctl enable libvirtd"
   bash_execute_command "sudo systemctl status libvirtd"
-  bash_execute_command "sudo setfacl -m u:qemu:rx /home/rolaya"
+  bash_execute_command "sudo setfacl -m u:qemu:rx /home/$USER"
   bash_execute_command "sudo yum install git -y"
   bash_execute_command "sudo yum install rpm-build -y"
   bash_execute_command "sudo yum install openssl-devel -y"

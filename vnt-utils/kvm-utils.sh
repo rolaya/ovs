@@ -115,6 +115,7 @@ kvm_utils_show_menu()
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
   show_menu_option "kvm_vnt_network_provision " " - Provision VNT KVM network"
+  show_menu_option "kvm_attach_interface      " " - Attach qos management network interface to kvm"
 
   # KVM guest image pool
   echo
@@ -307,7 +308,7 @@ kvm_install()
                --disk path=$KVM_IMAGES_DIR/$KVM_GUEST_NAME.img,bus=virtio,size=$kvm_size
                --network network:$kvm_ovs_network_name
                --graphics $KVM_INSTALL_OPTION_GRAPHICS
-               --location /home/rolaya/iso/$kvm_iso
+               --location /home/$USER/iso/$kvm_iso
                --extra-args console=ttyS0"
   echo "Executing: [$command]"
   $command                 
@@ -319,15 +320,12 @@ kvm_install()
 kvm_import()
 {
   local command=""
+  local kvm_config=${1:-"$g_kvm_guest_config_file"}
 
-  # Configuration file provided?
-  if [[ $# -eq 1 ]]; then
-    # Source provided VNT network node configuration file
-    source "$1"
-  else
-    # Source default VNT network node configuration file
-    source "$g_kvm_guest_config_file"
-  fi
+  # Read configuration
+  source "$kvm_config"
+
+  message "importing kvm based on configuration file:[$kvm_config]" $TEXT_VIEW_NORMAL_RED
 
   # Set configuration parameters for guest KVM.
   local kvm_name=$KVM_GUEST_NAME
@@ -491,7 +489,7 @@ kvm_guest_configuration_update()
     sed -i "$pattern" $kvm_guest_config
 
   else
-    message "usage: kvm_reprovision_net_interfaces kvm-name" $TEXT_VIEW_NORMAL_RED
+    message "usage: kvm_guest_configuration_update kvm-name" $TEXT_VIEW_NORMAL_RED
   fi    
 }
 
