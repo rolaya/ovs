@@ -48,24 +48,27 @@ vnt_utils_show_menu()
   echo -e "${TEXT_VIEW_NORMAL_GREEN}KVM guest management"
   echo "=========================================================================================================================="
   echo -e "${TEXT_VIEW_NORMAL}"
-  show_menu_option "vnt_node_list             " " - VNT node list"
-  show_menu_option "vnt_nodes_start           " " - VNT nodes start"
-  show_menu_option "vnt_nodes_shutdown        " " - VNT nodes shutdown"
-  show_menu_option "vnt_nodes_show_ip_address " " - VNT nodes show management interface ip address"
-  show_menu_option "vnt_node_start            " " - VNT node start"
-  show_menu_option "vnt_node_start_headless   " " - VNT node start"
-  show_menu_option "vnt_node_shutdown         " " - VNT node shutdown"
-  show_menu_option "vnt_node_get_latency      " " - VNT node get latency"
-  show_menu_option "vnt_node_set_latency      " " - VNT node set latency"
-  show_menu_option "vnt_node_del_latency      " " - VNT node delete latency"
+  show_menu_option "vnt_node_list              " " - VNT node list"
+  show_menu_option "vnt_nodes_start            " " - VNT nodes start"
+  show_menu_option "vnt_nodes_shutdown         " " - VNT nodes shutdown"
+  show_menu_option "vnt_nodes_show_ip_address  " " - VNT nodes show management interface ip address"
+  show_menu_option "vnt_node_start             " " - VNT node start"
+  show_menu_option "vnt_node_start_headless    " " - VNT node start"
+  show_menu_option "vnt_node_shutdown          " " - VNT node shutdown"
+  show_menu_option "vnt_node_get_latency       " " - VNT node get latency"
+  show_menu_option "vnt_node_set_latency       " " - VNT node set latency"
+  show_menu_option "vnt_node_del_latency       " " - VNT node delete latency"
 
-  show_menu_option "vnt_node_get_max_rate     " " - VNT node get max rate"
-  show_menu_option "vnt_node_set_max_rate     " " - VNT node set max rate"
-  show_menu_option "vnt_node_del_max_rate     " " - VNT node delete max rate"
+  show_menu_option "vnt_node_get_max_rate      " " - VNT node get max rate"
+  show_menu_option "vnt_node_set_max_rate      " " - VNT node set max rate"
+  show_menu_option "vnt_node_del_max_rate      " " - VNT node delete max rate"
 
-  show_menu_option "vnt_node_get_packet_loss  " " - VNT node get packet loss"
-  show_menu_option "vnt_node_set_packet_loss  " " - VNT node set packet loss"
-  show_menu_option "vnt_node_del_packet_loss  " " - VNT node delete packet loss"
+  show_menu_option "vnt_node_get_packet_loss   " " - VNT node get packet loss"
+  show_menu_option "vnt_node_set_packet_loss   " " - VNT node set packet loss"
+  show_menu_option "vnt_node_del_packet_loss   " " - VNT node delete packet loss"
+  show_menu_option "vnt_mcast_snooping_enable  " " - VNT multicast snooping enable"
+  show_menu_option "vnt_mcast_snooping_disable " " - VNT multicast snooping disable"
+
 
   #show_menu_option "vnt_node_htb_get_max_rate " " - VNT node get max rate"
   #show_menu_option "vnt_node_htb_set_max_rate " " - VNT node set max rate"
@@ -562,6 +565,22 @@ vnt_node_get_packet_loss()
   array_list_items_find "loss" packet_loss "${g_qos_info_other_config_array[@]}" 
 
   eval "$2='$packet_loss'"
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_mcast_snopping_enable()
+{
+  ovs_multicast_snooping_enable
+}
+
+#==================================================================================================================
+# 
+#==================================================================================================================
+vnt_mcast_snopping_disable()
+{
+  ovs_multicast_snooping_disable
 }
 
 #==================================================================================================================
